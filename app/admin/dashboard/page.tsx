@@ -28,8 +28,13 @@ export default async function AdminDashboard() {
     prisma.product.count(),
     prisma.inventory.findMany({
       where: { available: { lte: 5 } },
-      include: { variant: { include: { product: true } } },
-      take: 5,
+      include: {
+        variant: {
+          include: { product: true, color: true, size: true },
+        },
+      },
+      orderBy: { available: "asc" },
+      take: 6,
     }),
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
@@ -92,7 +97,7 @@ export default async function AdminDashboard() {
                         <p className="text-sm font-medium">{o.orderNumber}</p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(o.createdAt).toLocaleDateString()} ·{" "}
-                          {o._count.items} items
+                          {o._count.items} {o._count.items === 1 ? "item" : "items"}
                         </p>
                       </div>
                       <Badge tone="muted">{o.status}</Badge>
@@ -148,12 +153,30 @@ export default async function AdminDashboard() {
                   (i: {
                     id: string;
                     available: number;
-                    variant: { sku: string; product: { name: string } };
+                    variant: {
+                      sku: string;
+                      product: { name: string };
+                      color: { name: string } | null;
+                      size: { label: string } | null;
+                    };
                   }) => (
-                    <li key={i.id} className="flex justify-between text-sm">
-                      <span className="truncate">{i.variant.product.name}</span>
-                      <span className="font-medium text-warning">
-                        {i.available} left
+                    <li key={i.id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0">
+                        <span className="block truncate">{i.variant.product.name}</span>
+                        {/* Without the variant these rows read as the same
+                            product listed five times. */}
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {[i.variant.color?.name, i.variant.size?.label]
+                            .filter(Boolean)
+                            .join(" · ") || i.variant.sku}
+                        </span>
+                      </span>
+                      <span
+                        className={`shrink-0 font-medium ${
+                          i.available === 0 ? "text-danger" : "text-warning"
+                        }`}
+                      >
+                        {i.available === 0 ? "Out of stock" : `${i.available} left`}
                       </span>
                     </li>
                   )

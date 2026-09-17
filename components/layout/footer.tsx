@@ -1,68 +1,64 @@
 import Link from "next/link";
-import { Instagram, Facebook, Youtube } from "lucide-react";
+import { Instagram, Facebook, Youtube, Mail, Phone } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
+import { getSiteSettings } from "@/lib/settings/site";
 
-// Static link groups that don't depend on the catalog.
-const SHORTCUTS = [
-  { label: "Shop All", href: "/shop" },
-  { label: "New In", href: "/shop?sort=newest" },
-  { label: "On Sale", href: "/shop?onSale=1" },
+const PRODUCTS = [
+  { label: "Shop all", href: "/shop" },
+  { label: "New in", href: "/shop?sort=newest" },
+  { label: "Weekly pick", href: "/#popular" },
+  { label: "On sale", href: "/shop?onSale=1" },
 ];
 
 const COMPANY = [
   { label: "About us", href: "/about" },
   { label: "Contact us", href: "/contact" },
-  { label: "Payment Options", href: "/about#payments" },
-  { label: "Track Order", href: "/account/orders" },
-  { label: "Size Charts", href: "/about#sizes" },
+  { label: "Payment options", href: "/about#payments" },
+  { label: "Track order", href: "/account/orders" },
+  { label: "Size charts", href: "/about#sizes" },
+  { label: "Support", href: "/contact" },
 ];
 
 const LEGAL = [
   { label: "Privacy Policy", href: "/legal/privacy" },
-  { label: "Terms And Conditions", href: "/legal/terms" },
+  { label: "Terms & Conditions", href: "/legal/terms" },
   { label: "Cookie settings", href: "/legal/cookies" },
   { label: "Imprint", href: "/legal/imprint" },
 ];
 
 export async function Footer() {
-  // Pull whatever categories exist — shoes today, trousers/shirts tomorrow.
-  let categories: { slug: string; name: string }[] = [];
-  let storeName = "Shoe Express";
-  let socials: { instagram?: string; facebook?: string; youtube?: string } = {};
-  try {
-    const [cats, settings] = await Promise.all([
-      prisma.category.findMany({
+  const [settings, categories] = await Promise.all([
+    getSiteSettings(),
+    prisma.category
+      .findMany({
         where: { isActive: true },
         select: { slug: true, name: true },
         orderBy: { name: "asc" },
         take: 8,
-      }),
-      prisma.siteSettings.findFirst(),
-    ]);
-    categories = cats;
-    if (settings?.storeName) storeName = settings.storeName;
-    socials = (settings?.socials ?? {}) as typeof socials;
-  } catch {
-    /* pre-seed fallback */
-  }
+      })
+      .catch(() => []),
+  ]);
 
-  const socialLinks = [
-    { Icon: Instagram, label: "Instagram", href: socials.instagram || "#" },
-    { Icon: Facebook, label: "Facebook", href: socials.facebook || "#" },
-    { Icon: Youtube, label: "YouTube", href: socials.youtube || "#" },
-  ];
+  // Only render a social icon when a real URL is configured — an icon linking
+  // to "#" is the sort of dead control this build is meant to be free of.
+  const socials = [
+    { Icon: Instagram, label: "Instagram", href: settings.socials.instagram },
+    { Icon: Facebook, label: "Facebook", href: settings.socials.facebook },
+    { Icon: Youtube, label: "YouTube", href: settings.socials.youtube },
+  ].filter((s): s is { Icon: typeof Instagram; label: string; href: string } =>
+    Boolean(s.href && s.href !== "#")
+  );
 
   return (
     <footer className="bg-accent text-accent-foreground">
-      <div className="mx-auto max-w-content px-5 py-14 sm:px-8">
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-4">
-          {/* Shop shortcuts */}
+      <div className="mx-auto max-w-content px-5 py-14 sm:px-8 sm:py-16">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4">
           <div>
-            <h3 className="font-display text-lg font-semibold">Shop</h3>
-            <ul className="mt-4 space-y-2 text-sm text-accent-foreground/85">
-              {SHORTCUTS.map((l) => (
+            <h2 className="font-display text-lg font-semibold uppercase">Products</h2>
+            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
+              {PRODUCTS.map((l) => (
                 <li key={l.label}>
-                  <Link href={l.href} className="hover:text-white">
+                  <Link href={l.href} className="transition-colors hover:text-white">
                     {l.label}
                   </Link>
                 </li>
@@ -70,16 +66,15 @@ export async function Footer() {
             </ul>
           </div>
 
-          {/* Dynamic categories */}
           <div>
-            <h3 className="font-display text-lg font-semibold">Categories</h3>
-            <ul className="mt-4 space-y-2 text-sm text-accent-foreground/85">
+            <h2 className="font-display text-lg font-semibold uppercase">Category</h2>
+            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
               {categories.length > 0 ? (
                 categories.map((c) => (
                   <li key={c.slug}>
                     <Link
                       href={`/category/${c.slug}`}
-                      className="hover:text-white"
+                      className="transition-colors hover:text-white"
                     >
                       {c.name}
                     </Link>
@@ -87,21 +82,20 @@ export async function Footer() {
                 ))
               ) : (
                 <li>
-                  <Link href="/shop" className="hover:text-white">
-                    Shop All
+                  <Link href="/shop" className="transition-colors hover:text-white">
+                    Shop all
                   </Link>
                 </li>
               )}
             </ul>
           </div>
 
-          {/* Company */}
           <div>
-            <h3 className="font-display text-lg font-semibold">Company</h3>
-            <ul className="mt-4 space-y-2 text-sm text-accent-foreground/85">
+            <h2 className="font-display text-lg font-semibold uppercase">Company info</h2>
+            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
               {COMPANY.map((l) => (
                 <li key={l.label}>
-                  <Link href={l.href} className="hover:text-white">
+                  <Link href={l.href} className="transition-colors hover:text-white">
                     {l.label}
                   </Link>
                 </li>
@@ -109,35 +103,66 @@ export async function Footer() {
             </ul>
           </div>
 
-          {/* Social */}
           <div>
-            <h3 className="font-display text-lg font-semibold">Follow us</h3>
-            <div className="mt-4 flex gap-3">
-              {socialLinks.map(({ Icon, label, href }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  className="grid h-10 w-10 place-items-center rounded-full bg-white/20 hover:bg-white/30"
+            <h2 className="font-display text-lg font-semibold uppercase">Follow us</h2>
+
+            {socials.length > 0 ? (
+              <div className="mt-4 flex gap-3">
+                {socials.map(({ Icon, label, href }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label={label}
+                    className="grid h-10 w-10 place-items-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                  >
+                    <Icon className="h-5 w-5" aria-hidden />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-accent-foreground/70">
+                Social links can be added in Admin → Settings.
+              </p>
+            )}
+
+            <address className="mt-6 space-y-2 text-sm not-italic text-accent-foreground/85">
+              {settings.contactEmail && (
+                <a
+                  href={`mailto:${settings.contactEmail}`}
+                  className="flex items-center gap-2 transition-colors hover:text-white"
                 >
-                  <Icon className="h-5 w-5" />
-                </Link>
-              ))}
-            </div>
+                  <Mail className="h-4 w-4" aria-hidden />
+                  {settings.contactEmail}
+                </a>
+              )}
+              {settings.phone && (
+                <a
+                  href={`tel:${settings.phone.replace(/\s/g, "")}`}
+                  className="flex items-center gap-2 transition-colors hover:text-white"
+                >
+                  <Phone className="h-4 w-4" aria-hidden />
+                  {settings.phone}
+                </a>
+              )}
+            </address>
           </div>
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-6">
+        <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/25 pt-6">
           <p className="text-sm text-accent-foreground/75">
-            © {new Date().getFullYear()} {storeName}. All rights reserved.
+            © {new Date().getFullYear()} {settings.storeName}. All rights reserved.
           </p>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-accent-foreground/75">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-accent-foreground/75">
             {LEGAL.map((l) => (
-              <Link key={l.label} href={l.href} className="hover:text-white">
-                {l.label}
-              </Link>
+              <li key={l.label}>
+                <Link href={l.href} className="transition-colors hover:text-white">
+                  {l.label}
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </footer>

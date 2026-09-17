@@ -3,28 +3,36 @@
 @tailwind utilities;
 
 :root {
-  /* ---- color tokens (from the architecture blueprint) ---- */
-  --background: #ffffff;
-  --foreground: #12232a;
+  /* ---- colour tokens ----
 
-  --primary: #0d7f8f;
-  --primary-foreground: #ffffff;
-  --primary-deep: #0a6a78;
+     Stored as space-separated RGB channels, not hex, so Tailwind can inject an
+     alpha into them: `bg-primary/10` compiles to
+     `rgb(var(--primary) / 0.1)`. With a hex value Tailwind cannot parse the
+     colour, silently emits no rule at all for the opacity modifier, and the
+     element falls back to an inherited colour — which is how sidebar labels
+     ended up dark-on-dark. Raw CSS uses `rgb(var(--token))`.
+  */
+  --background: 255 255 255;
+  --foreground: 18 35 42;
 
-  --secondary: #12232a;
-  --secondary-foreground: #ffffff;
+  --primary: 13 127 143;
+  --primary-foreground: 255 255 255;
+  --primary-deep: 10 106 120;
 
-  --accent: #e8825f;
-  --accent-foreground: #ffffff;
+  --secondary: 18 35 42;
+  --secondary-foreground: 255 255 255;
 
-  --muted: #f4f7f8;
-  --muted-foreground: #5b7078;
+  --accent: 232 130 95;
+  --accent-foreground: 255 255 255;
 
-  --border: #dce5e7;
+  --muted: 244 247 248;
+  --muted-foreground: 91 112 120;
 
-  --success: #2f9e6f;
-  --warning: #c8871f;
-  --danger: #c0463f;
+  --border: 220 229 231;
+
+  --success: 47 158 111;
+  --warning: 180 115 26;
+  --danger: 192 70 63;
 
   /* ---- radii (deliberately non-uniform) ---- */
   --r-pill: 999px;
@@ -32,13 +40,21 @@
   --r-control: 10px;
   --r-sm: 6px;
 
-  /* ---- elevation ---- */
-  --shadow-card: 0 10px 30px rgba(13, 127, 143, 0.08);
-  --shadow-hover: 0 16px 40px rgba(13, 127, 143, 0.14);
+  /* ---- elevation ----
+     Tinted with the brand colour rather than a hardcoded copy of it, so
+     re-theming `--primary` carries through to the shadows too. */
+  --shadow-card: 0 10px 30px rgb(var(--primary) / 0.08);
+  --shadow-hover: 0 16px 40px rgb(var(--primary) / 0.14);
+
+  /* ---- motion ---- */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --reveal-distance: 18px;
+  --reveal-duration: 0.55s;
+  --reveal-step: 0.07s;
 }
 
 * {
-  border-color: var(--border);
+  border-color: rgb(var(--border));
 }
 
 html {
@@ -46,8 +62,8 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -60,18 +76,116 @@ body {
 
 /* Accessible focus — visible keyboard ring */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid rgb(var(--primary));
   outline-offset: 2px;
 }
 
-/* Respect reduced motion globally */
+/* ---------------------------------------------------------------- reveals --
+
+   The hidden state is scoped to `[data-js="on"]`, which an inline script in the
+   root layout sets before first paint. Without JavaScript — a crawler, a failed
+   bundle, a blocked script — none of these rules apply and every section is
+   simply visible. Nothing can leave content stranded at `opacity: 0`.
+--------------------------------------------------------------------------- */
+
+[data-js="on"] .reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-distance));
+  transition:
+    opacity var(--reveal-duration) var(--ease-out-expo),
+    transform var(--reveal-duration) var(--ease-out-expo);
+  will-change: opacity, transform;
+}
+
+[data-js="on"] .reveal.reveal-in {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+[data-js="on"] .reveal-group .reveal-item {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity var(--reveal-duration) var(--ease-out-expo),
+    transform var(--reveal-duration) var(--ease-out-expo);
+}
+
+[data-js="on"] .reveal-group-in .reveal-item {
+  opacity: 1;
+  transform: none;
+}
+
+/* Each item waits one step longer than the one before it. */
+[data-js="on"] .reveal-group .reveal-item:nth-child(1) { transition-delay: calc(var(--reveal-step) * 0); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(2) { transition-delay: calc(var(--reveal-step) * 1); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(3) { transition-delay: calc(var(--reveal-step) * 2); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(4) { transition-delay: calc(var(--reveal-step) * 3); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(5) { transition-delay: calc(var(--reveal-step) * 4); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(6) { transition-delay: calc(var(--reveal-step) * 5); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(7) { transition-delay: calc(var(--reveal-step) * 6); }
+[data-js="on"] .reveal-group .reveal-item:nth-child(n + 8) { transition-delay: calc(var(--reveal-step) * 7); }
+
+/* ------------------------------------------------------- decorative float --
+
+   The hero's accent circles drift forever. As CSS keyframes on `transform`
+   they stay on the compositor and never touch the main thread — the same
+   loops driven by a JS animation library keep requesting frames for as long
+   as the page is open, which costs battery and stops the page ever going
+   idle. `animation-play-state` pauses them when the hero scrolls away.
+--------------------------------------------------------------------------- */
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(var(--float-distance, -14px)); }
+}
+
+.float {
+  animation: float-y var(--float-duration, 6s) ease-in-out infinite;
+}
+
+.float-paused {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .float {
+    animation: none;
+  }
+}
+
+/* Hide the horizontal scrollbar on product rails without disabling scrolling. */
+.rail-scroll {
+  scrollbar-width: none;
+}
+.rail-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ------------------------------------------------------------ reduced motion --
+
+   Movement is removed; content still appears. Opacity is left alone because a
+   cross-fade is not the kind of motion that triggers vestibular symptoms, and
+   zeroing the transition entirely would make reveals snap.
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+  }
+
+  [data-js="on"] .reveal,
+  [data-js="on"] .reveal-group .reveal-item {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

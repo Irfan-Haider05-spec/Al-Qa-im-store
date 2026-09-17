@@ -6,3 +6,6 @@ node_modules
 *.log
 /coverage
 next-env.d.ts
+.cache
+.tmp
+*.tsbuildinfo

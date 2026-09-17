@@ -1,0 +1,241 @@
+{
+  "_readme": [
+    "Source manifest for every photograph shipped in /public.",
+    "Photos are hosted on Unsplash and used under the Unsplash License",
+    "(https://unsplash.com/license), which permits free commercial use.",
+    "`npm run assets:build` downloads each photo once, optimises it to WebP and,",
+    "for hero shots, keys out the solid studio background to a transparent PNG.",
+    "Swapping in your own photography means editing this file (or replacing the",
+    "generated files in /public) — nothing in the app hardcodes a remote URL."
+  ],
+  "source": "https://images.unsplash.com/photo-{id}",
+  "products": [
+    {
+      "slug": "court-legend-af",
+      "photos": [
+        "1600269452121-4f2416e55c28",
+        "1608229751021-ed4bd8677753",
+        "1695073621086-aa692bc32a3d"
+      ]
+    },
+    {
+      "slug": "sunset-racer",
+      "photos": [
+        "1595950653106-6c9ebd614d3a",
+        "1560769629-975ec94e6a86",
+        "1620138546344-7b2c38516edf"
+      ]
+    },
+    {
+      "slug": "metro-knit-slip",
+      "photos": [
+        "1608231387042-66d1773070a5",
+        "1544441892-794166f1e3be",
+        "1615109255391-b0dfdcd5b8d8"
+      ]
+    },
+    {
+      "slug": "urban-tread-mid",
+      "photos": [
+        "1549298916-b41d501d3772",
+        "1512374382149-233c42b6a83b",
+        "1542219550-37153d387c27"
+      ]
+    },
+    {
+      "slug": "azure-court-low",
+      "photos": [
+        "1579338559194-a162d19bf842",
+        "1654907075271-154b3a4d3bf3",
+        "1595341888016-a392ef81b7de"
+      ]
+    },
+    {
+      "slug": "noir-elite",
+      "photos": [
+        "1557461761-c7c2b7a5fa97",
+        "1585944672394-4c58a015c1fb",
+        "1518894781321-630e638d0742"
+      ]
+    },
+    {
+      "slug": "the-joyride",
+      "photos": [
+        "1604671801908-6f0c6a092c05",
+        "1606107557195-0e29a4b5b4aa",
+        "1560769629-975ec94e6a86"
+      ]
+    },
+    {
+      "slug": "aero-runner-pro",
+      "photos": [
+        "1600185365483-26d7a4cc7519",
+        "1600185365926-3a2ce3cdb9eb",
+        "1608667508764-33cf0726b13a"
+      ]
+    },
+    {
+      "slug": "velocity-knit-x",
+      "photos": [
+        "1606107557195-0e29a4b5b4aa",
+        "1605348532760-6753d2c43329",
+        "1625860191460-10a66c7384fb"
+      ]
+    },
+    {
+      "slug": "crimson-flash",
+      "photos": [
+        "1542291026-7eec264c27ff",
+        "1548801133-da353ebb1d97",
+        "1520316587275-5e4f06f355e6"
+      ]
+    },
+    {
+      "slug": "cloud-nine-runner",
+      "photos": [
+        "1562424995-2efe650421dd",
+        "1597350584914-55bb62285896",
+        "1625860191460-10a66c7384fb"
+      ]
+    },
+    {
+      "slug": "pulse-trainer",
+      "photos": [
+        "1551107696-a4b0c5a0d9a2",
+        "1617152623457-4c9b639926d7",
+        "1605034313761-73ea4a0cfbf3"
+      ]
+    },
+    {
+      "slug": "blaze-high-top",
+      "photos": [
+        "1595909236612-9fd30b476365",
+        "1618677831708-0e7fda3148b4",
+        "1533681018184-68bd1d883b97"
+      ]
+    },
+    {
+      "slug": "storm-court-mid",
+      "photos": [
+        "1631984564919-1f6b2313a71c",
+        "1728724794795-681832a6afd0",
+        "1557848979-f13d18a41bb2"
+      ]
+    },
+    {
+      "slug": "heritage-oxford",
+      "photos": [
+        "1668069226492-508742b03147",
+        "1449505278894-297fdb3edbc1",
+        "1646139498425-5bceb422ba6a"
+      ]
+    },
+    {
+      "slug": "chestnut-derby",
+      "photos": [
+        "1641893843833-a006778dc00b",
+        "1625357165350-bdbcb6d7d524",
+        "1614252235316-8c857d38b5f4"
+      ]
+    },
+    {
+      "slug": "walnut-brogue",
+      "photos": [
+        "1614253429340-98120bd6d753",
+        "1603191659812-ee978eeeef76",
+        "1634304138376-43a922e96c80"
+      ]
+    },
+    {
+      "slug": "summit-trail-gtx",
+      "photos": [
+        "1549290127-7f758fdadff7",
+        "1603796847227-9183fd69e884",
+        "1563434564528-8fdf5996e622"
+      ]
+    },
+    {
+      "slug": "ridge-hiker-wp",
+      "photos": [
+        "1575987116913-e96e7d490b8a",
+        "1631287381310-925554130169",
+        "1559506026-181ed433f0b0"
+      ]
+    }
+  ],
+  "_heroReadme": [
+    "Hero shots are cut out of their studio backdrop so the shoe floats over the",
+    "brand circle exactly like the reference. `tolerance` is how far a pixel may",
+    "sit from the backdrop colour and still be keyed out: raise it when a halo of",
+    "backdrop survives, lower it when the shoe itself starts eroding (white shoes",
+    "on a white seamless need the lowest values)."
+  ],
+  "hero": [
+    {
+      "name": "hero-1",
+      "photo": "1600185365926-3a2ce3cdb9eb",
+      "tolerance": 34,
+      "productSlug": "aero-runner-pro"
+    },
+    {
+      "name": "hero-2",
+      "photo": "1606107557195-0e29a4b5b4aa",
+      "tolerance": 22,
+      "productSlug": "velocity-knit-x"
+    },
+    {
+      "name": "hero-3",
+      "photo": "1605348532760-6753d2c43329",
+      "tolerance": 52,
+      "productSlug": "noir-elite"
+    },
+    {
+      "name": "hero-4",
+      "photo": "1542291026-7eec264c27ff",
+      "tolerance": 60,
+      "productSlug": "crimson-flash"
+    },
+    {
+      "name": "hero-5",
+      "photo": "1608667508764-33cf0726b13a",
+      "tolerance": 38,
+      "productSlug": "sunset-racer"
+    }
+  ],
+  "banners": [
+    {
+      "name": "promo-primary",
+      "photo": "1520316587275-5e4f06f355e6",
+      "width": 1800,
+      "height": 900
+    },
+    {
+      "name": "promo-secondary",
+      "photo": "1637003833874-971d4da7eea6",
+      "width": 1800,
+      "height": 900
+    }
+  ],
+  "categories": [
+    {
+      "slug": "sneakers",
+      "photo": "1608229751021-ed4bd8677753"
+    },
+    {
+      "slug": "sports-shoes",
+      "photo": "1600185365483-26d7a4cc7519"
+    },
+    {
+      "slug": "basketball",
+      "photo": "1631984564919-1f6b2313a71c"
+    },
+    {
+      "slug": "oxford",
+      "photo": "1449505278894-297fdb3edbc1"
+    },
+    {
+      "slug": "boots",
+      "photo": "1549290127-7f758fdadff7"
+    }
+  ]
+}

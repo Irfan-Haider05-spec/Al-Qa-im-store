@@ -1,308 +1,197 @@
-import { PrismaClient, Gender, Role } from "@prisma/client";
+/**
+ * Seeds a complete, believable store: catalogue, variants with real stock
+ * levels, moderated reviews, past orders, CMS content and site settings.
+ *
+ *   npm run db:seed
+ *
+ * Safe to re-run — everything upserts on a natural key, so an existing store
+ * keeps its edits (a product you renamed in Admin is not clobbered) while
+ * anything missing is filled in.
+ */
+import { PrismaClient, Gender, Role, OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { BANNERS, BRANDS, CATEGORIES, HERO_SLIDES, PRODUCTS } from "./catalog";
 
 const prisma = new PrismaClient();
 
-// ---- catalog definition -----------------------------------------------------
-type SeedProduct = {
-  name: string;
-  slug: string;
-  categorySlug: string;
-  gender: Gender;
-  basePrice: number;
-  salePrice?: number;
-  shortDesc: string;
-  description: string;
-  tags: string[];
-  colors: { name: string; hex: string }[];
-  sizes: string[];
-  flags?: Partial<{
-    isFeatured: boolean;
-    isNewArrival: boolean;
-    isWeeklyPick: boolean;
-    isOnSale: boolean;
-  }>;
-};
+const DEFAULT_STOCK = 24;
+const LOW_STOCK = 3;
 
-const CATEGORIES = [
-  { name: "Sneakers", slug: "sneakers" },
-  { name: "Sports Shoes", slug: "sports-shoes" },
-  { name: "Oxford", slug: "oxford" },
-  { name: "Shirts", slug: "shirts" },
-  { name: "Trousers", slug: "trousers" },
-  { name: "Sale", slug: "sale" },
+/** Deterministic pseudo-random so re-seeding produces the same demo store. */
+function seededRandom(seed: string) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+const REVIEW_COPY = [
+  { rating: 5, title: "Exactly as described", comment: "Turned up in two days, fit true to size and the quality is well above what I expected at this price. Second pair ordered." },
+  { rating: 5, title: "Comfortable straight away", comment: "No break-in at all — wore them for a full day of walking the day they arrived and had no complaints." },
+  { rating: 4, title: "Great, but size up", comment: "Really well made and the colour is accurate to the photos. They run a touch narrow, so go up half a size if you have wide feet." },
+  { rating: 5, title: "Worth it", comment: "I hesitated at the price and shouldn't have. Three months of daily wear and they still look new." },
+  { rating: 4, title: "Good everyday shoe", comment: "Does what I wanted it to do. The sole is grippier than my last pair which is the main thing for me." },
+  { rating: 3, title: "Nice, sole is firm", comment: "Looks great and the leather is lovely, but the sole is firmer than I like for standing all day. Fine for normal wear." },
 ];
 
-const PRODUCTS: SeedProduct[] = [
-  {
-    name: "Aero Runner Teal",
-    slug: "aero-runner-teal",
-    categorySlug: "sneakers",
-    gender: Gender.MEN,
-    basePrice: 129,
-    shortDesc: "Lightweight everyday runner.",
-    description:
-      "A lightweight everyday runner with responsive cushioning and a breathable knit upper.",
-    tags: ["running", "lightweight", "new"],
-    colors: [
-      { name: "Teal", hex: "#0d7f8f" },
-      { name: "White", hex: "#f4f7f8" },
-    ],
-    sizes: ["8", "9", "10", "11"],
-    flags: { isFeatured: true, isNewArrival: true },
-  },
-  {
-    name: "Roshe Racer",
-    slug: "roshe-racer",
-    categorySlug: "sneakers",
-    gender: Gender.WOMEN,
-    basePrice: 119,
-    shortDesc: "Slip-on comfort for all day.",
-    description:
-      "A minimalist slip-on with a cushioned footbed and a gum outsole for grip and style.",
-    tags: ["casual", "slip-on", "new"],
-    colors: [{ name: "Navy", hex: "#1f3a5f" }],
-    sizes: ["6", "7", "8", "9"],
-    flags: { isNewArrival: true },
-  },
-  {
-    name: "Zoom-X Sprint",
-    slug: "zoom-x-sprint",
-    categorySlug: "sports-shoes",
-    gender: Gender.MEN,
-    basePrice: 159,
-    shortDesc: "Race-day speed and rebound.",
-    description:
-      "Built for tempo runs and race day with a propulsive foam and a lockdown fit.",
-    tags: ["running", "performance"],
-    colors: [
-      { name: "Teal", hex: "#0d7f8f" },
-      { name: "Black", hex: "#12232a" },
-    ],
-    sizes: ["8", "9", "10", "11", "12"],
-    flags: { isNewArrival: true, isFeatured: true },
-  },
-  {
-    name: "Court Classic Oxford",
-    slug: "court-classic-oxford",
-    categorySlug: "oxford",
-    gender: Gender.MEN,
-    basePrice: 149,
-    shortDesc: "Clean leather everyday formal.",
-    description:
-      "A refined leather Oxford with a cushioned insole — dressy enough for the office, comfortable enough for the commute.",
-    tags: ["formal", "leather"],
-    colors: [{ name: "Brown", hex: "#6b4a2b" }],
-    sizes: ["8", "9", "10", "11"],
-  },
-  {
-    name: "The Joyride",
-    slug: "the-joyride",
-    categorySlug: "sneakers",
-    gender: Gender.UNISEX,
-    basePrice: 390,
-    shortDesc: "Bead-cushioned statement sneaker.",
-    description:
-      "A statement sneaker with bead-based cushioning that adapts to every step. Our weekly pick.",
-    tags: ["premium", "cushioned"],
-    colors: [
-      { name: "Coral", hex: "#e8825f" },
-      { name: "Teal", hex: "#0d7f8f" },
-    ],
-    sizes: ["41", "42", "43", "44"],
-    flags: { isWeeklyPick: true, isFeatured: true },
-  },
-  {
-    name: "Trail Blaze GTX",
-    slug: "trail-blaze-gtx",
-    categorySlug: "sports-shoes",
-    gender: Gender.MEN,
-    basePrice: 179,
-    salePrice: 129,
-    shortDesc: "Grippy weatherproof trail shoe.",
-    description:
-      "An aggressive-lug trail shoe with a weatherproof membrane for wet and technical terrain.",
-    tags: ["trail", "waterproof", "sale"],
-    colors: [{ name: "Olive", hex: "#5b6b3a" }],
-    sizes: ["9", "10", "11", "12"],
-    flags: { isOnSale: true },
-  },
-  {
-    name: "Metro Knit Slip",
-    slug: "metro-knit-slip",
-    categorySlug: "sneakers",
-    gender: Gender.WOMEN,
-    basePrice: 99,
-    salePrice: 69,
-    shortDesc: "Breathable knit city shoe.",
-    description:
-      "A breathable knit slip-on for the city — packable, washable, and endlessly comfortable.",
-    tags: ["casual", "knit", "sale"],
-    colors: [
-      { name: "Grey", hex: "#8a9aa0" },
-      { name: "Coral", hex: "#e8825f" },
-    ],
-    sizes: ["6", "7", "8", "9"],
-    flags: { isOnSale: true },
-  },
-  {
-    name: "Heritage Derby",
-    slug: "heritage-derby",
-    categorySlug: "oxford",
-    gender: Gender.MEN,
-    basePrice: 165,
-    shortDesc: "Waxed-leather derby.",
-    description:
-      "A waxed-leather derby with Goodyear-style welting for durability and a timeless silhouette.",
-    tags: ["formal", "leather"],
-    colors: [{ name: "Black", hex: "#12232a" }],
-    sizes: ["8", "9", "10", "11"],
-  },
-  // ---- clothing: same model, apparel sizes (S/M/L/XL) ----
-  {
-    name: "Everyday Oxford Shirt",
-    slug: "everyday-oxford-shirt",
-    categorySlug: "shirts",
-    gender: Gender.MEN,
-    basePrice: 49,
-    shortDesc: "Breathable cotton button-down.",
-    description:
-      "A crisp cotton Oxford shirt with a tailored fit — works for the office or the weekend.",
-    tags: ["cotton", "slim-fit", "new"],
-    colors: [
-      { name: "White", hex: "#f4f7f8" },
-      { name: "Sky", hex: "#7fb2c9" },
-    ],
-    sizes: ["S", "M", "L", "XL"],
-    flags: { isNewArrival: true },
-  },
-  {
-    name: "Linen Weekend Shirt",
-    slug: "linen-weekend-shirt",
-    categorySlug: "shirts",
-    gender: Gender.WOMEN,
-    basePrice: 55,
-    salePrice: 39,
-    shortDesc: "Relaxed breathable linen.",
-    description:
-      "A relaxed-fit linen shirt that keeps you cool — perfect for warm days.",
-    tags: ["linen", "relaxed", "sale"],
-    colors: [{ name: "Sand", hex: "#d8c3a5" }],
-    sizes: ["S", "M", "L"],
-    flags: { isOnSale: true },
-  },
-  {
-    name: "Slim Chino Trousers",
-    slug: "slim-chino-trousers",
-    categorySlug: "trousers",
-    gender: Gender.MEN,
-    basePrice: 69,
-    shortDesc: "Stretch cotton chinos.",
-    description:
-      "Slim-fit stretch chinos with a clean finish — comfortable enough to wear all day.",
-    tags: ["cotton", "slim-fit"],
-    colors: [
-      { name: "Navy", hex: "#1f3a5f" },
-      { name: "Stone", hex: "#c9bda3" },
-    ],
-    sizes: ["30", "32", "34", "36"],
-    flags: { isFeatured: true, isNewArrival: true },
-  },
-  {
-    name: "Tailored Wool Trousers",
-    slug: "tailored-wool-trousers",
-    categorySlug: "trousers",
-    gender: Gender.WOMEN,
-    basePrice: 89,
-    shortDesc: "Structured wool-blend.",
-    description:
-      "Tailored wool-blend trousers with a sharp crease and a comfortable mid-rise.",
-    tags: ["wool", "tailored"],
-    colors: [{ name: "Charcoal", hex: "#3a3f44" }],
-    sizes: ["6", "8", "10", "12"],
-  },
+const REVIEWERS = [
+  { email: "amelia.hart@example.com", name: "Amelia Hart" },
+  { email: "daniel.osei@example.com", name: "Daniel Osei" },
+  { email: "priya.raman@example.com", name: "Priya Raman" },
+  { email: "marco.silva@example.com", name: "Marco Silva" },
+  { email: "jen.whitfield@example.com", name: "Jen Whitfield" },
 ];
 
-async function main() {
-  console.log("Seeding Shoe Express…");
-
-  // ---- admin ----
+async function seedUsers() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@shoeexpress.test";
   const adminPass = process.env.SEED_ADMIN_PASSWORD ?? "changeme123";
-  await prisma.user.upsert({
+
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {
       email: adminEmail,
-      passwordHash: await bcrypt.hash(adminPass, 10),
+      passwordHash: await bcrypt.hash(adminPass, 12),
       name: "Store Admin",
       role: Role.SUPER_ADMIN,
     },
   });
-  console.log(`  admin: ${adminEmail} / ${adminPass}`);
+  console.log(`  admin     ${adminEmail} / ${adminPass}`);
 
-  // ---- demo customer ----
-  const customerEmail = "customer@shoeexpress.test";
-  await prisma.user.upsert({
-    where: { email: customerEmail },
+  const customer = await prisma.user.upsert({
+    where: { email: "customer@shoeexpress.test" },
     update: {},
     create: {
-      email: customerEmail,
-      passwordHash: await bcrypt.hash("customer123", 10),
+      email: "customer@shoeexpress.test",
+      passwordHash: await bcrypt.hash("customer123", 12),
       name: "Demo Customer",
       role: Role.CUSTOMER,
     },
   });
-  console.log(`  customer: ${customerEmail} / customer123`);
+  console.log("  customer  customer@shoeexpress.test / customer123");
 
-  // ---- settings ----
-  if (!(await prisma.siteSettings.findFirst())) {
+  // A handful of review authors, so ratings aren't all from one account.
+  const reviewers = [];
+  for (const r of REVIEWERS) {
+    reviewers.push(
+      await prisma.user.upsert({
+        where: { email: r.email },
+        update: {},
+        create: {
+          email: r.email,
+          name: r.name,
+          passwordHash: await bcrypt.hash("customer123", 12),
+          role: Role.CUSTOMER,
+        },
+      })
+    );
+  }
+
+  if (!(await prisma.address.findFirst({ where: { userId: customer.id } }))) {
+    await prisma.address.create({
+      data: {
+        userId: customer.id,
+        fullName: "Demo Customer",
+        phone: "+1 415 555 0134",
+        line1: "410 Mission Street",
+        line2: "Apt 12B",
+        city: "San Francisco",
+        state: "CA",
+        postalCode: "94105",
+        country: "US",
+        isDefault: true,
+      },
+    });
+  }
+
+  return { admin, customer, reviewers };
+}
+
+async function seedSettings() {
+  const existing = await prisma.siteSettings.findFirst();
+  if (!existing) {
     await prisma.siteSettings.create({
       data: {
         storeName: "Shoe Express",
         currency: "USD",
         contactEmail: "hello@shoeexpress.test",
-        flatShipping: 5.0,
+        phone: "+1 415 555 0100",
+        address: "410 Mission Street, San Francisco, CA 94105",
+        flatShipping: 9.0,
         freeShippingThreshold: 100.0,
         taxRate: 0.0,
-        socials: { instagram: "#", facebook: "#", youtube: "#" },
+        socials: {
+          instagram: "https://instagram.com",
+          facebook: "https://facebook.com",
+          youtube: "https://youtube.com",
+        },
       },
     });
+    console.log("  settings  created");
   }
 
-  // ---- categories ----
+  const seoDefaults = [
+    {
+      pageKey: "home",
+      title: "Shoe Express — Premium footwear for every step",
+      description:
+        "Sneakers, performance runners, leather Oxfords and waterproof boots, chosen for how they wear rather than how they look on a shelf. Free delivery over $100.",
+      ogImageUrl: "/banners/promo-primary.webp",
+    },
+    {
+      pageKey: "shop",
+      title: "Shop all footwear",
+      description:
+        "Browse the full Shoe Express range — filter by category, size, colour, price and availability.",
+      ogImageUrl: "/banners/promo-primary.webp",
+    },
+  ];
+  for (const seo of seoDefaults) {
+    await prisma.sEOSettings.upsert({
+      where: { pageKey: seo.pageKey },
+      update: {},
+      create: seo,
+    });
+  }
+}
+
+async function seedCatalogue() {
   for (const c of CATEGORIES) {
     await prisma.category.upsert({
       where: { slug: c.slug },
       update: {},
-      create: c,
+      create: {
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        seoTitle: c.seoTitle,
+        seoDesc: c.seoDesc,
+        imageUrl: c.hasImage ? `/categories/${c.slug}.webp` : null,
+      },
     });
   }
+  console.log(`  category  ${CATEGORIES.length} categories`);
 
-  // ---- brand ----
-  const brand = await prisma.brand.upsert({
-    where: { slug: "express-athletics" },
-    update: {},
-    create: { name: "Express Athletics", slug: "express-athletics" },
-  });
+  for (const b of BRANDS) {
+    await prisma.brand.upsert({ where: { slug: b.slug }, update: {}, create: b });
+  }
 
-  // ---- products ----
-  let weeklyPickId: string | null = null;
-
+  let created = 0;
   for (const p of PRODUCTS) {
-    const category = await prisma.category.findUnique({
-      where: { slug: p.categorySlug },
-    });
-    if (!category) continue;
+    if (await prisma.product.findUnique({ where: { slug: p.slug } })) continue;
 
-    const existing = await prisma.product.findUnique({
-      where: { slug: p.slug },
-    });
-    if (existing) {
-      if (p.flags?.isWeeklyPick) weeklyPickId = existing.id;
-      continue;
-    }
+    const [category, brand] = await Promise.all([
+      prisma.category.findUnique({ where: { slug: p.categorySlug } }),
+      prisma.brand.findUnique({ where: { slug: p.brandSlug } }),
+    ]);
 
+    const sku = p.slug.toUpperCase().replace(/-/g, "");
     const product = await prisma.product.create({
       data: {
         name: p.name,
@@ -312,132 +201,264 @@ async function main() {
         gender: p.gender,
         basePrice: p.basePrice,
         salePrice: p.salePrice ?? null,
-        sku: p.slug.toUpperCase(),
-        tags: p.tags,
+        sku,
+        tags: [...p.tags, p.material.toLowerCase().split(" ")[0]],
         isPublished: true,
         isFeatured: p.flags?.isFeatured ?? false,
         isNewArrival: p.flags?.isNewArrival ?? false,
         isWeeklyPick: p.flags?.isWeeklyPick ?? false,
-        isOnSale: p.flags?.isOnSale ?? false,
-        brandId: brand.id,
-        categoryId: category.id,
+        isOnSale: p.flags?.isOnSale ?? p.salePrice != null,
+        seoTitle: `${p.name} — ${p.shortDesc}`,
+        seoDesc: p.description.slice(0, 155),
+        ogImageUrl: `/products/${p.slug}-1.webp`,
+        brandId: brand?.id ?? null,
+        categoryId: category?.id ?? null,
         colors: { create: p.colors },
-        sizes: { create: p.sizes.map((label) => ({ label })) },
+        sizes: { create: p.sizes.map((label, position) => ({ label, position })) },
+        images: {
+          create: [0, 1, 2].map((i) => ({
+            url: `/products/${p.slug}-${i + 1}.webp`,
+            alt: `${p.name} — ${["side profile", "detail", "pair"][i]}`,
+            position: i,
+            isPrimary: i === 0,
+          })),
+        },
       },
       include: { colors: true, sizes: true },
     });
 
-    // variants = colors × sizes, each with inventory
+    // Variants = colours × sizes. Stock varies per size so the storefront shows
+    // genuine "only 3 left" and "sold out" states rather than a flat number.
     for (const color of product.colors) {
       for (const size of product.sizes) {
+        const available = p.stock?.out?.includes(size.label)
+          ? 0
+          : p.stock?.low?.includes(size.label)
+            ? LOW_STOCK
+            : DEFAULT_STOCK;
         await prisma.productVariant.create({
           data: {
-            sku: `${product.sku}-${color.name}-${size.label}`,
+            sku: `${sku}-${color.name.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 6)}-${size.label}`,
             productId: product.id,
             colorId: color.id,
             sizeId: size.id,
-            inventory: {
-              create: { available: 20, lowStockAt: 5 },
-            },
+            inventory: { create: { available, lowStockAt: 5 } },
           },
         });
       }
     }
+    created++;
+  }
+  console.log(`  product   ${created} created, ${PRODUCTS.length - created} already present`);
+}
 
-    // gallery images (3 branded placeholders per product, shipped in /public)
-    for (let i = 0; i < 3; i++) {
-      await prisma.productImage.create({
+async function seedReviews(reviewers: { id: string }[]) {
+  const products = await prisma.product.findMany({ where: { isPublished: true } });
+  let created = 0;
+
+  for (const product of products) {
+    const random = seededRandom(product.slug);
+    const count = 2 + Math.floor(random() * 3); // 2–4 reviews each
+
+    for (let i = 0; i < count; i++) {
+      const reviewer = reviewers[Math.floor(random() * reviewers.length)];
+      const copy = REVIEW_COPY[Math.floor(random() * REVIEW_COPY.length)];
+      const existing = await prisma.review.findFirst({
+        where: { productId: product.id, userId: reviewer.id },
+      });
+      if (existing) continue;
+
+      await prisma.review.create({
         data: {
           productId: product.id,
-          url: `/products/${product.slug}-${i + 1}.svg`,
-          alt: `${product.name} — view ${i + 1}`,
-          position: i,
-          isPrimary: i === 0,
+          userId: reviewer.id,
+          rating: copy.rating,
+          title: copy.title,
+          comment: copy.comment,
+          // One in six stays unapproved so the moderation queue isn't empty.
+          isApproved: random() > 0.16,
         },
       });
+      created++;
     }
+  }
+  console.log(`  review    ${created} created`);
+}
 
-    if (p.flags?.isWeeklyPick) weeklyPickId = product.id;
-    console.log(`  product: ${p.name}`);
+async function seedOrders(customerId: string) {
+  if ((await prisma.order.count()) > 0) {
+    console.log("  order     already present");
+    return;
   }
 
-  // ---- homepage CMS ----
-  const existingHome = await prisma.homepage.findFirst();
-  if (!existingHome) {
-    await prisma.homepage.create({
+  const variants = await prisma.productVariant.findMany({
+    include: { product: true, color: true, size: true },
+    take: 60,
+  });
+  if (variants.length === 0) return;
+
+  const address = await prisma.address.findFirst({ where: { userId: customerId } });
+  const shippingAddress = {
+    fullName: address?.fullName ?? "Demo Customer",
+    phone: address?.phone ?? "+1 415 555 0134",
+    line1: address?.line1 ?? "410 Mission Street",
+    line2: address?.line2 ?? null,
+    city: address?.city ?? "San Francisco",
+    state: address?.state ?? "CA",
+    postalCode: address?.postalCode ?? "94105",
+    country: address?.country ?? "US",
+  };
+
+  // A spread of statuses and dates so the dashboard charts have a real shape.
+  const plan: { status: OrderStatus; daysAgo: number; items: number; paid: boolean }[] = [
+    { status: OrderStatus.DELIVERED, daysAgo: 42, items: 2, paid: true },
+    { status: OrderStatus.DELIVERED, daysAgo: 31, items: 1, paid: true },
+    { status: OrderStatus.DELIVERED, daysAgo: 24, items: 3, paid: true },
+    { status: OrderStatus.SHIPPED, daysAgo: 12, items: 1, paid: true },
+    { status: OrderStatus.SHIPPED, daysAgo: 9, items: 2, paid: true },
+    { status: OrderStatus.PROCESSING, daysAgo: 5, items: 2, paid: true },
+    { status: OrderStatus.CONFIRMED, daysAgo: 3, items: 1, paid: true },
+    { status: OrderStatus.PENDING, daysAgo: 1, items: 2, paid: false },
+    { status: OrderStatus.CANCELLED, daysAgo: 18, items: 1, paid: false },
+  ];
+
+  const random = seededRandom("orders");
+
+  for (const [i, spec] of plan.entries()) {
+    const createdAt = new Date(Date.now() - spec.daysAgo * 86_400_000);
+    const picked = Array.from({ length: spec.items }, () => variants[Math.floor(random() * variants.length)]);
+
+    const items = picked.map((v) => {
+      const unitPrice = Number(v.product.salePrice ?? v.product.basePrice);
+      const quantity = 1 + Math.floor(random() * 2);
+      return {
+        variantId: v.id,
+        productName: v.product.name,
+        variantLabel: [v.color?.name, v.size?.label].filter(Boolean).join(" / "),
+        unitPrice,
+        quantity,
+        lineTotal: unitPrice * quantity,
+      };
+    });
+
+    const subtotal = items.reduce((n, it) => n + it.lineTotal, 0);
+    const shipping = subtotal >= 100 ? 0 : 9;
+    const total = subtotal + shipping;
+
+    await prisma.order.create({
+      data: {
+        orderNumber: `SE-${String(1000 + i)}`,
+        userId: customerId,
+        status: spec.status,
+        subtotal,
+        discount: 0,
+        shipping,
+        tax: 0,
+        total,
+        shippingAddress,
+        createdAt,
+        updatedAt: createdAt,
+        trackingNumber:
+          spec.status === OrderStatus.SHIPPED || spec.status === OrderStatus.DELIVERED
+            ? `TRK${900_000 + i}`
+            : null,
+        items: {
+          create: items.map((item) => ({
+            variantId: item.variantId,
+            productName: item.productName,
+            variantLabel: item.variantLabel,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+          })),
+        },
+        payment: {
+          create: {
+            method: PaymentMethod.COD,
+            status: spec.paid ? PaymentStatus.PAID : PaymentStatus.PENDING,
+            amount: total,
+          },
+        },
+      },
+    });
+  }
+  console.log(`  order     ${plan.length} created`);
+}
+
+async function seedCms() {
+  const weeklyPick = await prisma.product.findFirst({ where: { isWeeklyPick: true } });
+  let homepage = await prisma.homepage.findFirst();
+
+  if (!homepage) {
+    homepage = await prisma.homepage.create({
       data: {
         heroHeading: "SPORTS SHOES",
         heroSubheading: "Men's collection",
         heroDescription:
-          "Discover premium footwear designed for movement, comfort and everyday style.",
+          "Find your true stride with Shoe Express — performance builds, everyday classics and a fit that holds from the first mile to the last.",
         heroCtaLabel: "Shop Now",
         heroCtaUrl: "/shop",
         weeklyPickHeading: "OUR WEEKLY PICK",
-        weeklyPickDesc: "Hand-picked by our team, refreshed every week.",
-        weeklyPickProductId: weeklyPickId,
+        weeklyPickDesc: "Chosen by our team every Monday. This week, the one people keep coming back for.",
+        weeklyPickProductId: weeklyPick?.id ?? null,
         membershipHeading: "Become a member and get 20% off",
         membershipCtaLabel: "Sign up for free now",
         membershipCtaUrl: "/register",
-        slides: {
-          create: [
-            { imageUrl: "/hero/hero-1.svg", position: 0, isActive: true },
-            { imageUrl: "/hero/hero-2.svg", position: 1, isActive: true },
-            { imageUrl: "/hero/hero-3.svg", position: 2, isActive: true },
-          ],
-        },
       },
     });
-  } else if (weeklyPickId && !existingHome.weeklyPickProductId) {
+    console.log("  homepage  created");
+  } else if (weeklyPick && !homepage.weeklyPickProductId) {
     await prisma.homepage.update({
-      where: { id: existingHome.id },
-      data: { weeklyPickProductId: weeklyPickId },
+      where: { id: homepage.id },
+      data: { weeklyPickProductId: weeklyPick.id },
     });
   }
 
-  // ---- sample approved reviews (so ratings render) ----
-  const reviewCustomer = await prisma.user.findUnique({
-    where: { email: customerEmail },
-  });
-  const reviewTargets = await prisma.product.findMany({
-    where: { isPublished: true },
-    take: 4,
-  });
-  if (reviewCustomer) {
-    for (const [i, prod] of reviewTargets.entries()) {
-      const existing = await prisma.review.findFirst({
-        where: { productId: prod.id, userId: reviewCustomer.id },
+  if ((await prisma.heroSlide.count({ where: { homepageId: homepage.id } })) === 0) {
+    for (const [position, slide] of HERO_SLIDES.entries()) {
+      const product = await prisma.product.findUnique({ where: { slug: slide.productSlug } });
+      await prisma.heroSlide.create({
+        data: {
+          homepageId: homepage.id,
+          productId: product?.id ?? null,
+          imageUrl: slide.imageUrl,
+          position,
+          durationMs: 4200,
+          isActive: true,
+        },
       });
-      if (!existing) {
-        await prisma.review.create({
-          data: {
-            productId: prod.id,
-            userId: reviewCustomer.id,
-            rating: 5 - (i % 2),
-            title: i % 2 === 0 ? "Excellent" : "Really comfortable",
-            comment:
-              "Great fit and quality — exactly what I expected. Would buy again.",
-            isApproved: true,
-          },
-        });
-      }
     }
-    console.log("  reviews: seeded sample approved reviews");
+    console.log(`  hero      ${HERO_SLIDES.length} slides`);
   }
 
-  // ---- sample coupon ----
-  await prisma.coupon.upsert({
-    where: { code: "WELCOME20" },
-    update: {},
-    create: {
-      code: "WELCOME20",
-      type: "PERCENT",
-      value: 20,
-      minOrder: 50,
-      isActive: true,
-    },
-  });
-  console.log("  coupon: WELCOME20 (20% off orders over $50)");
+  if ((await prisma.banner.count()) === 0) {
+    for (const banner of BANNERS) {
+      await prisma.banner.create({ data: { ...banner, isActive: true } });
+    }
+    console.log(`  banner    ${BANNERS.length} created`);
+  }
+}
 
+async function seedCoupons() {
+  const coupons = [
+    { code: "WELCOME20", type: "PERCENT" as const, value: 20, minOrder: 50, isActive: true },
+    { code: "FREESHIP", type: "FIXED" as const, value: 9, minOrder: 40, isActive: true },
+    { code: "EXPIRED10", type: "PERCENT" as const, value: 10, minOrder: 0, isActive: true, expiresAt: new Date(Date.now() - 86_400_000) },
+  ];
+  for (const c of coupons) {
+    await prisma.coupon.upsert({ where: { code: c.code }, update: {}, create: c });
+  }
+  console.log("  coupon    WELCOME20 (20% over $50), FREESHIP ($9 over $40)");
+}
+
+async function main() {
+  console.log("Seeding Shoe Express…");
+  const { customer, reviewers } = await seedUsers();
+  await seedSettings();
+  await seedCatalogue();
+  await seedReviews(reviewers);
+  await seedOrders(customer.id);
+  await seedCms();
+  await seedCoupons();
   console.log("Seed complete.");
 }
 
