@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ---- color tokens (from the architecture blueprint) ---- */
+  --background: #ffffff;
+  --foreground: #12232a;
+
+  --primary: #0d7f8f;
+  --primary-foreground: #ffffff;
+  --primary-deep: #0a6a78;
+
+  --secondary: #12232a;
+  --secondary-foreground: #ffffff;
+
+  --accent: #e8825f;
+  --accent-foreground: #ffffff;
+
+  --muted: #f4f7f8;
+  --muted-foreground: #5b7078;
+
+  --border: #dce5e7;
+
+  --success: #2f9e6f;
+  --warning: #c8871f;
+  --danger: #c0463f;
+
+  /* ---- radii (deliberately non-uniform) ---- */
+  --r-pill: 999px;
+  --r-card: 14px;
+  --r-control: 10px;
+  --r-sm: 6px;
+
+  /* ---- elevation ---- */
+  --shadow-card: 0 10px 30px rgba(13, 127, 143, 0.08);
+  --shadow-hover: 0 16px 40px rgba(13, 127, 143, 0.14);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Condensed editorial display treatment */
+.font-display {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Accessible focus — visible keyboard ring */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
