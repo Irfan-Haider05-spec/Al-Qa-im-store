@@ -45,7 +45,7 @@ export function HeroSlideManager({
   const [draft, setDraft] = useState({
     imageUrl: "",
     productId: "",
-    durationMs: 4200,
+    durationMs: 1000,
     isActive: true,
   });
 
@@ -116,7 +116,7 @@ export function HeroSlideManager({
               </label>
               <input
                 type="number"
-                min={1500}
+                min={600}
                 max={20000}
                 step={100}
                 defaultValue={slide.durationMs}
@@ -221,7 +221,7 @@ export function HeroSlideManager({
             <label className="mb-1 block text-sm font-medium">Hold (ms)</label>
             <input
               type="number"
-              min={1500}
+              min={600}
               max={20000}
               step={100}
               className={input}
@@ -239,7 +239,7 @@ export function HeroSlideManager({
               run(async () => {
                 const result = await createHeroSlide(draft);
                 if (result.ok) {
-                  setDraft({ imageUrl: "", productId: "", durationMs: 4200, isActive: true });
+                  setDraft({ imageUrl: "", productId: "", durationMs: 1000, isActive: true });
                 }
                 return result;
               }, "Slide added.")

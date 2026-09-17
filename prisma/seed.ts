@@ -422,7 +422,7 @@ async function seedCms() {
           productId: product?.id ?? null,
           imageUrl: slide.imageUrl,
           position,
-          durationMs: 4200,
+          durationMs: 1000,
           isActive: true,
         },
       });

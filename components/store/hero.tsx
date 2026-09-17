@@ -33,11 +33,16 @@ export type HeroContent = {
  * keeps it nearly full-bleed vertically on a laptop without ballooning on an
  * ultrawide.
  */
+/** How long a shoe holds the hero spot before the next one comes round. */
+const HOLD_MS = 1000;
+/** Travel time between stops — shorter than the hold, so each shoe settles. */
+const TRAVEL_MS = 650;
+
 const ANCHOR = [
   "aspect-square -translate-x-1/2 -translate-y-1/2 left-1/2 top-1/2",
   // Small screens stack: the circle is centred in its own band below the copy.
   "w-[86vw] sm:w-[66vw]",
-  "lg:left-[83%] lg:w-[min(58vw,84vh)]",
+  "lg:left-[83%] lg:w-[min(52vw,78vh)]",
 ].join(" ");
 
 /**
@@ -91,7 +96,11 @@ export function Hero({
   const reduce = useSafeReducedMotion();
   const sectionRef = useRef<HTMLElement>(null);
   const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // Hover and tab-visibility are tracked apart: sharing one `paused` flag let
+  // a mouse-leave cancel the pause a hidden tab had just set, and vice versa.
+  const [hovering, setHovering] = useState(false);
+  const [tabHidden, setTabHidden] = useState(false);
+  const paused = hovering || tabHidden;
 
   // Scroll progress, measured in the handler rather than with `useScroll`:
   // that reads the element once on mount, and any later layout change leaves
@@ -135,17 +144,23 @@ export function Hero({
 
   // Advance around the circle. Pauses on hover or focus, and while the tab is
   // hidden — a backgrounded tab throttles timers and resumes mid-transition.
+  //
+  // This deliberately keeps running under `prefers-reduced-motion`. That
+  // setting asks for less *movement*, not for the page to stop showing
+  // different products; under it the shoes cross-fade in place instead of
+  // sweeping round the arc (see the transition classes below).
   useEffect(() => {
-    if (reduce || paused || slides.length <= 1) return;
+    if (paused || slides.length <= 1) return;
     const id = setTimeout(
       () => setActive((i) => (i + 1) % slides.length),
-      slides[active]?.durationMs ?? 4200
+      slides[active]?.durationMs ?? HOLD_MS
     );
     return () => clearTimeout(id);
-  }, [active, paused, reduce, slides]);
+  }, [active, paused, slides]);
 
   useEffect(() => {
-    const onVisibility = () => setPaused(document.hidden);
+    const onVisibility = () => setTabHidden(document.hidden);
+    onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
@@ -156,7 +171,7 @@ export function Hero({
   return (
     <section
       ref={sectionRef}
-      className="relative isolate overflow-hidden pb-14 pt-24 sm:pt-28 lg:min-h-[88vh] lg:pb-0"
+      className="relative isolate overflow-hidden pb-14 pt-24 sm:pt-28 lg:min-h-[92vh] lg:pb-0"
     >
       {/* ------------------------------------------------------- copy -- */}
       <motion.div
@@ -200,7 +215,7 @@ export function Hero({
             className="h-full w-full rounded-full bg-primary"
           >
             {/* The white disc bitten out of the circle's right side. */}
-            <span className="absolute right-[-6%] top-1/2 block h-[34%] w-[34%] -translate-y-1/2 rounded-full bg-background" />
+            <span className="absolute left-[59%] top-[42%] block h-[34%] w-[34%] -translate-y-1/2 rounded-full bg-background" />
           </motion.div>
         </div>
 
@@ -218,10 +233,10 @@ export function Hero({
 
         {slides.length > 0 && (
           <div
-            onMouseEnter={() => setPaused(true)}
-            onMouseLeave={() => setPaused(false)}
-            onFocusCapture={() => setPaused(true)}
-            onBlurCapture={() => setPaused(false)}
+            onMouseEnter={() => setHovering(true)}
+            onMouseLeave={() => setHovering(false)}
+            onFocusCapture={() => setHovering(true)}
+            onBlurCapture={() => setHovering(false)}
             className={`pointer-events-none absolute ${ANCHOR}`}
           >
             {/* Nudged right on small screens so the hero shoe lands centred
@@ -248,8 +263,11 @@ export function Hero({
                       // flourish.
                       className={[
                         "absolute inset-0 will-change-transform",
-                        "transition-[transform,opacity] duration-[1100ms]",
-                        "ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                        "transition-[transform,opacity] duration-[650ms]",
+                        "ease-[cubic-bezier(0.22,1,0.36,1)]",
+                        // Reduced motion: cross-fade in place. The transform
+                        // snaps, so nothing travels across the screen.
+                        "motion-reduce:transition-[opacity] motion-reduce:duration-500",
                         isActive ? "" : "hidden lg:block",
                       ].join(" ")}
                       style={{
@@ -265,7 +283,7 @@ export function Hero({
                       >
                         <div
                           className={[
-                            "absolute inset-0 transition-transform duration-[1100ms]",
+                            "absolute inset-0 transition-transform duration-[650ms]",
                             "ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                           ].join(" ")}
                           style={{ transform: `rotate(${rotate}deg)` }}

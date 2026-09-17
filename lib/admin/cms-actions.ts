@@ -214,7 +214,7 @@ export async function saveSettings(input: unknown) {
 const heroSlideSchema = z.object({
   imageUrl: z.string().min(1, "An image is required"),
   productId: z.string().optional().or(z.literal("")),
-  durationMs: z.coerce.number().int().min(1500).max(20000),
+  durationMs: z.coerce.number().int().min(600).max(20000),
   isActive: z.boolean().default(true),
 });
 
