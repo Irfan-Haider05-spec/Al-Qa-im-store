@@ -9,6 +9,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/shop`, priority: 0.9 },
     { url: `${BASE}/contact`, priority: 0.4 },
     { url: `${BASE}/about`, priority: 0.4 },
+    ...["privacy", "terms", "cookies", "imprint"].map((slug) => ({
+      url: `${BASE}/legal/${slug}`,
+      priority: 0.2,
+    })),
   ];
 
   try {

@@ -1,39 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  getProductBySlug,
-  getRelatedProducts,
-} from "@/lib/products/queries";
-import { effectivePrice, ratingSummary } from "@/lib/products/pricing";
-import { ProductGallery } from "@/components/product/product-gallery";
-import { BuyPanel } from "@/components/product/buy-panel";
+import { getProductBySlug, getRelatedProducts } from "@/lib/products/queries";
+import { effectivePrice, ratingSummary, totalStock } from "@/lib/products/pricing";
+import { getSiteSettings, describeShipping } from "@/lib/settings/site";
+import { getWishlistProductIds } from "@/lib/account/wishlist-actions";
+import { ProductDetail } from "@/components/product/product-detail";
 import { ProductCard } from "@/components/product/product-card";
 import { Rating } from "@/components/ui/rating";
-
-// Local shapes for arrays whose element types come from the Prisma include.
-type ImageRow = { url: string; alt: string | null };
-type ColorRow = { id: string; name: string; hex: string };
-type SizeRow = { id: string; label: string };
-type VariantRow = {
-  id: string;
-  colorId: string | null;
-  sizeId: string | null;
-  price: unknown;
-  salePrice: unknown;
-  inventory: { available: number } | null;
-};
-type ReviewRow = {
-  id: string;
-  rating: number;
-  title: string | null;
-  comment: string | null;
-  user: { name: string | null } | null;
-};
-// Related products carry the productCardInclude shape; ProductCard types it loosely.
-type RelatedRow = React.ComponentProps<typeof ProductCard>["product"] & {
-  id: string;
-};
 
 type Params = { slug: string };
 
@@ -64,6 +38,11 @@ export async function generateMetadata({
           ? [product.images[0].url]
           : [],
     },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 
@@ -76,144 +55,228 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
+  const [related, settings, saved] = await Promise.all([
+    getRelatedProducts(product.categoryId, product.id),
+    getSiteSettings(),
+    getWishlistProductIds(),
+  ]);
+
   const { base, sale, price } = effectivePrice(product);
   const rating = ratingSummary(product.reviews);
-  const related = await getRelatedProducts(product.categoryId, product.id);
+  const stock = totalStock(product.variants);
 
-  // Product JSON-LD (only include rating when real reviews exist).
+  // Rating distribution, so the summary shows more than one number.
+  const distribution = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: product.reviews.filter((r) => r.rating === star).length,
+  }));
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+
   const jsonLd = {
-    "@context": "https://schema.org/",
-    "@type": "Product",
-    name: product.name,
-    description: product.shortDesc ?? product.description ?? undefined,
-    sku: product.sku ?? undefined,
-    brand: product.brand
-      ? { "@type": "Brand", name: product.brand.name }
-      : undefined,
-    image: product.images.map((i: ImageRow) => i.url),
-    offers: {
-      "@type": "Offer",
-      price: price.toFixed(2),
-      priceCurrency: "USD",
-      availability: "https://schema.org/InStock",
-    },
-    ...(rating.count > 0
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: rating.average.toFixed(1),
-            reviewCount: rating.count,
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Product",
+        name: product.name,
+        description: product.shortDesc ?? product.description ?? undefined,
+        sku: product.sku ?? undefined,
+        brand: product.brand
+          ? { "@type": "Brand", name: product.brand.name }
+          : undefined,
+        image: product.images.map((i) => `${siteUrl}${i.url}`),
+        offers: {
+          "@type": "Offer",
+          url: `${siteUrl}/products/${product.slug}`,
+          price: price.toFixed(2),
+          priceCurrency: settings.currency,
+          // Reflects real inventory rather than always claiming availability.
+          availability:
+            stock > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+        },
+        // Only asserted when approved reviews actually exist.
+        ...(rating.count > 0
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: rating.average.toFixed(1),
+                reviewCount: rating.count,
+              },
+            }
+          : {}),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: `${siteUrl}/` },
+          { "@type": "ListItem", position: 2, name: "Shop", item: `${siteUrl}/shop` },
+          ...(product.category
+            ? [
+                {
+                  "@type": "ListItem",
+                  position: 3,
+                  name: product.category.name,
+                  item: `${siteUrl}/category/${product.category.slug}`,
+                },
+              ]
+            : []),
+          {
+            "@type": "ListItem",
+            position: product.category ? 4 : 3,
+            name: product.name,
           },
-        }
-      : {}),
+        ],
+      },
+    ],
   };
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8">
+    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Breadcrumb */}
-      <nav className="mb-6 text-sm text-muted-foreground">
-        <Link href="/" className="hover:text-foreground">
+      <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
+        <Link href="/" className="transition-colors hover:text-foreground">
           Home
-        </Link>{" "}
-        /{" "}
-        <Link href="/shop" className="hover:text-foreground">
+        </Link>
+        <span className="mx-1.5">/</span>
+        <Link href="/shop" className="transition-colors hover:text-foreground">
           Shop
-        </Link>{" "}
-        / <span className="text-foreground">{product.name}</span>
+        </Link>
+        {product.category && (
+          <>
+            <span className="mx-1.5">/</span>
+            <Link
+              href={`/category/${product.category.slug}`}
+              className="transition-colors hover:text-foreground"
+            >
+              {product.category.name}
+            </Link>
+          </>
+        )}
+        <span className="mx-1.5">/</span>
+        <span className="text-foreground">{product.name}</span>
       </nav>
 
-      <div className="grid gap-10 lg:grid-cols-2">
-        <ProductGallery images={product.images} name={product.name} />
-
-        <BuyPanel
-          productName={product.name}
-          basePrice={base}
-          salePrice={sale}
-          colors={product.colors.map((c: ColorRow) => ({
-            id: c.id,
-            name: c.name,
-            hex: c.hex,
-          }))}
-          sizes={product.sizes.map((s: SizeRow) => ({ id: s.id, label: s.label }))}
-          variants={product.variants.map((v: VariantRow) => ({
+      <ProductDetail
+        images={product.images.map((i) => ({
+          url: i.url,
+          alt: i.alt,
+          colorId: i.colorId,
+        }))}
+        panel={{
+          productId: product.id,
+          productName: product.name,
+          basePrice: base,
+          salePrice: sale,
+          colors: product.colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex })),
+          sizes: product.sizes.map((s) => ({ id: s.id, label: s.label })),
+          variants: product.variants.map((v) => ({
             id: v.id,
             colorId: v.colorId,
             sizeId: v.sizeId,
-            price: v.price != null ? String(v.price) : null,
-            salePrice: v.salePrice != null ? String(v.salePrice) : null,
-            inventory: v.inventory
-              ? { available: v.inventory.available }
-              : null,
-          }))}
-          rating={rating}
-        />
-      </div>
+            inventory: v.inventory ? { available: v.inventory.available } : null,
+          })),
+          rating,
+          currency: settings.currency,
+          savedToWishlist: saved.has(product.id),
+        }}
+      />
 
-      {/* Description + specs */}
-      <section className="mt-16 grid gap-10 lg:grid-cols-2">
+      <section className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-14">
         <div>
           <h2 className="font-display text-2xl font-bold">Description</h2>
-          <p className="mt-3 leading-relaxed text-muted-foreground">
+          <p className="mt-4 leading-relaxed text-muted-foreground">
             {product.description}
           </p>
         </div>
+
         <div>
           <h2 className="font-display text-2xl font-bold">Details</h2>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between border-b border-border py-2">
-              <dt className="text-muted-foreground">Brand</dt>
-              <dd>{product.brand?.name ?? "—"}</dd>
-            </div>
-            <div className="flex justify-between border-b border-border py-2">
-              <dt className="text-muted-foreground">Category</dt>
-              <dd>{product.category?.name ?? "—"}</dd>
-            </div>
-            <div className="flex justify-between border-b border-border py-2">
-              <dt className="text-muted-foreground">SKU</dt>
-              <dd>{product.sku ?? "—"}</dd>
-            </div>
-            <div className="flex justify-between border-b border-border py-2">
-              <dt className="text-muted-foreground">Shipping</dt>
-              <dd>Free over $100 · flat $5 otherwise</dd>
-            </div>
-            <div className="flex justify-between py-2">
-              <dt className="text-muted-foreground">Returns</dt>
-              <dd>30-day returns</dd>
-            </div>
+          <dl className="mt-4 text-sm">
+            {[
+              ["Brand", product.brand?.name ?? "—"],
+              ["Category", product.category?.name ?? "—"],
+              ["SKU", product.sku ?? "—"],
+              ["Shipping", describeShipping(settings)],
+              ["Returns", "30 days, unworn and in original packaging"],
+            ].map(([term, value]) => (
+              <div
+                key={term}
+                className="flex justify-between gap-6 border-b border-border py-3"
+              >
+                <dt className="text-muted-foreground">{term}</dt>
+                <dd className="text-right font-medium">{value}</dd>
+              </div>
+            ))}
           </dl>
         </div>
       </section>
 
-      {/* Reviews */}
       <section className="mt-16">
-        <h2 className="font-display text-2xl font-bold">Reviews</h2>
+        <h2 className="font-display text-2xl font-bold">
+          Reviews{rating.count > 0 && ` (${rating.count})`}
+        </h2>
+
         {product.reviews.length === 0 ? (
-          <p className="mt-3 text-muted-foreground">
-            No reviews yet. Purchase this product to leave the first review.
+          <p className="mt-4 rounded-card border border-dashed border-border p-8 text-center text-muted-foreground">
+            No reviews yet. Buy this product and you can be the first to review it.
           </p>
         ) : (
-          <div className="mt-4 space-y-6">
-            <Rating value={rating.average} count={rating.count} />
-            <ul className="space-y-5">
-              {product.reviews.map((r: ReviewRow) => (
-                <li key={r.id} className="border-b border-border pb-5">
-                  <div className="flex items-center gap-3">
-                    <Rating value={r.rating} showCount={false} size={14} />
-                    <span className="text-sm font-medium">
-                      {r.user?.name ?? "Verified buyer"}
+          <div className="mt-6 grid gap-10 lg:grid-cols-[18rem_1fr]">
+            <div className="rounded-card border border-border p-6">
+              <p className="font-display text-5xl font-bold">
+                {rating.average.toFixed(1)}
+              </p>
+              <div className="mt-2">
+                <Rating value={rating.average} count={rating.count} />
+              </div>
+
+              <ul className="mt-5 space-y-2">
+                {distribution.map(({ star, count }) => (
+                  <li key={star} className="flex items-center gap-3 text-sm">
+                    <span className="w-8 text-muted-foreground">{star}★</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-pill bg-muted">
+                      <span
+                        className="block h-full rounded-pill bg-accent"
+                        style={{
+                          width: `${rating.count ? (count / rating.count) * 100 : 0}%`,
+                        }}
+                      />
                     </span>
+                    <span className="w-6 text-right text-muted-foreground">{count}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <ul className="space-y-6">
+              {product.reviews.map((review) => (
+                <li key={review.id} className="border-b border-border pb-6 last:border-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Rating value={review.rating} showCount={false} size={14} />
+                    <span className="text-sm font-medium">
+                      {review.user?.name ?? "Verified buyer"}
+                    </span>
+                    <time
+                      dateTime={review.createdAt.toISOString()}
+                      className="text-xs text-muted-foreground"
+                    >
+                      {review.createdAt.toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </time>
                   </div>
-                  {r.title && (
-                    <p className="mt-2 font-medium">{r.title}</p>
-                  )}
-                  {r.comment && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {r.comment}
+                  {review.title && <p className="mt-2 font-medium">{review.title}</p>}
+                  {review.comment && (
+                    <p className="mt-1 leading-relaxed text-muted-foreground">
+                      {review.comment}
                     </p>
                   )}
                 </li>
@@ -223,13 +286,12 @@ export default async function ProductPage({
         )}
       </section>
 
-      {/* Related */}
       {related.length > 0 && (
         <section className="mt-16">
           <h2 className="font-display text-2xl font-bold">You may also like</h2>
-          <div className="mt-6 grid grid-cols-2 gap-5 md:grid-cols-4">
-            {related.map((p: RelatedRow) => (
-              <ProductCard key={p.id} product={p} />
+          <div className="mt-6 grid grid-cols-2 gap-5 lg:grid-cols-4">
+            {related.map((p) => (
+              <ProductCard key={p.id} product={p} saved={saved.has(p.id)} />
             ))}
           </div>
         </section>

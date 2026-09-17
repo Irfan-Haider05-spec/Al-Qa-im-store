@@ -20,7 +20,8 @@ Supabase**. Every step is a real command or dashboard action.
 npm install                 # also runs `prisma generate`
 cp .env.example .env        # then fill in the values (see §2)
 npm run db:push             # create tables in Supabase
-npm run db:seed             # seed admin, products, reviews, coupon
+npm run assets:build        # download + process the product photography
+npm run db:seed             # seed admin, products, reviews, coupons, CMS
 npm run dev                 # http://localhost:3000
 ```
 
@@ -80,6 +81,9 @@ npx prisma migrate deploy      # if you use migrations
 # — or —
 npm run db:push                # if you use db push
 npm run db:seed                # seed the first admin + content
+
+# Images live in /public. Either commit them, or run the pipeline in CI:
+npm run assets:build
 ```
 
 > Prefer `prisma migrate deploy` for production (tracked, reversible). Use

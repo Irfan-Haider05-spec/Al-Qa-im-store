@@ -1,12 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Rating } from "@/components/ui/rating";
+import { WishlistButton } from "@/components/product/wishlist-button";
 import { formatPrice } from "@/lib/utils/format";
-import { effectivePrice, ratingSummary } from "@/lib/products/pricing";
+import { effectivePrice, ratingSummary, totalStock } from "@/lib/products/pricing";
 
-// Loose typing so this accepts the productCardInclude shape without friction.
+/** Structural shape rather than a Prisma type, so cards accept trimmed selects. */
 export type CardProduct = {
   id: string;
   slug: string;
@@ -16,67 +16,110 @@ export type CardProduct = {
   images: { url: string; alt: string | null }[];
   colors: { hex: string; name: string }[];
   reviews: { rating: number }[];
+  variants?: { inventory: { available: number } | null }[];
+  category?: { name: string } | null;
   isNewArrival?: boolean;
 };
 
 export function ProductCard({
   product,
   currency = "USD",
+  saved = false,
+  priority = false,
+  sizes = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw",
 }: {
   product: CardProduct;
   currency?: string;
+  saved?: boolean;
+  priority?: boolean;
+  sizes?: string;
 }) {
-  const { price, hasDiscount, base, discountPct } = effectivePrice(
-    product as never
-  );
+  const { price, hasDiscount, base, discountPct } = effectivePrice(product as never);
   const { average, count } = ratingSummary(product.reviews);
-  const img = product.images[0];
+  const [primary, secondary] = product.images;
+  const stock = product.variants ? totalStock(product.variants) : null;
+  const soldOut = stock === 0;
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-card border border-border bg-background transition-shadow hover:shadow-hover">
-      <Link
-        href={`/products/${product.slug}`}
-        className="relative block aspect-square overflow-hidden bg-muted"
-      >
-        {img ? (
-          <Image
-            src={img.url}
-            alt={img.alt ?? product.name}
-            fill
-            sizes="(max-width:768px) 50vw, 25vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="grid h-full place-items-center text-sm text-muted-foreground">
-            No image
-          </div>
-        )}
+    <article className="group relative flex flex-col overflow-hidden rounded-card border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-hover">
+      <div className="relative aspect-square overflow-hidden bg-muted">
+        <Link
+          href={`/products/${product.slug}`}
+          className="absolute inset-0"
+          // The whole card is one link target; the heading repeats the name for
+          // assistive tech, so the image link itself stays out of the tab order
+          // description.
+          aria-label={product.name}
+        >
+          {primary ? (
+            <>
+              <Image
+                src={primary.url}
+                alt={primary.alt ?? product.name}
+                fill
+                priority={priority}
+                sizes={sizes}
+                className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+              {/* Second shot fades in over the first on hover — a real gallery
+                  peek rather than a zoom on the same photo. */}
+              {secondary && (
+                <Image
+                  src={secondary.url}
+                  alt=""
+                  fill
+                  sizes={sizes}
+                  className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 motion-reduce:transition-none"
+                />
+              )}
+            </>
+          ) : (
+            <div className="grid h-full place-items-center text-sm text-muted-foreground">
+              No image
+            </div>
+          )}
+        </Link>
 
-        <div className="absolute left-3 top-3 flex flex-col gap-2">
-          {product.isNewArrival && <Badge tone="primary">New</Badge>}
-          {hasDiscount && <Badge tone="accent">-{discountPct}%</Badge>}
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-2">
+          {soldOut ? (
+            <Badge tone="muted">Sold out</Badge>
+          ) : (
+            <>
+              {product.isNewArrival && <Badge tone="primary">New</Badge>}
+              {hasDiscount && <Badge tone="accent">−{discountPct}%</Badge>}
+            </>
+          )}
         </div>
 
-        <button
-          type="button"
-          aria-label="Add to wishlist"
-          className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-background/90 text-foreground/70 opacity-0 shadow-card transition-opacity hover:text-accent group-hover:opacity-100"
-        >
-          <Heart className="h-4 w-4" />
-        </button>
-      </Link>
+        <div className="absolute right-3 top-3">
+          <WishlistButton
+            productId={product.id}
+            productName={product.name}
+            initialSaved={saved}
+          />
+        </div>
+      </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <Link href={`/products/${product.slug}`} className="hover:text-primary">
-          <h3 className="font-medium leading-snug">{product.name}</h3>
-        </Link>
+        {product.category && (
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {product.category.name}
+          </p>
+        )}
+
+        <h3 className="font-medium leading-snug">
+          <Link
+            href={`/products/${product.slug}`}
+            className="transition-colors hover:text-primary"
+          >
+            {product.name}
+          </Link>
+        </h3>
 
         <Rating value={average} count={count} size={14} />
 
-        <div className="mt-auto flex items-center gap-2">
-          <span className="font-semibold">
-            {formatPrice(price, currency)}
-          </span>
+        <div className="mt-auto flex items-baseline gap-2 pt-1">
+          <span className="font-semibold">{formatPrice(price, currency)}</span>
           {hasDiscount && (
             <span className="text-sm text-muted-foreground line-through">
               {formatPrice(base, currency)}
@@ -85,7 +128,7 @@ export function ProductCard({
         </div>
 
         {product.colors.length > 0 && (
-          <div className="flex gap-1.5 pt-1">
+          <div className="flex items-center gap-1.5 pt-1">
             {product.colors.slice(0, 5).map((c) => (
               <span
                 key={c.name}
@@ -94,9 +137,14 @@ export function ProductCard({
                 style={{ backgroundColor: c.hex }}
               />
             ))}
+            {product.colors.length > 5 && (
+              <span className="text-xs text-muted-foreground">
+                +{product.colors.length - 5}
+              </span>
+            )}
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 }

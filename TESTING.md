@@ -5,7 +5,7 @@ Run through this before considering a release done. Check each box.
 ## Customer — storefront
 
 - [ ] Homepage renders; hero animation cycles (and is static with reduced motion)
-- [ ] Popular category pills link to category pages
+- [ ] Popular category pills re-query the catalogue via `?popular=` and keep the URL shareable
 - [ ] New Arrivals show real products with prices/ratings
 - [ ] Shop: category filter works and updates `?category=`
 - [ ] Shop: gender / price / sale filters work

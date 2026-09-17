@@ -212,7 +212,7 @@ export function ProductForm({
               type="checkbox"
               checked={Boolean(form[key])}
               onChange={(e) => set(key, e.target.checked as never)}
-              className="h-4 w-4 accent-[var(--primary)]"
+              className="h-4 w-4 accent-primary"
             />
             {lbl}
           </label>

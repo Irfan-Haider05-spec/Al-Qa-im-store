@@ -202,3 +202,132 @@ export async function saveSettings(input: unknown) {
   revalidatePath("/admin/settings");
   return { ok: true };
 }
+
+// ---------------- Hero slides ----------------
+
+/**
+ * The hero carousel is CMS-driven: slides, their order, how long each one
+ * holds and whether it runs at all are all editable here, and the storefront
+ * picks the change up on the next request because every mutation revalidates
+ * the homepage.
+ */
+const heroSlideSchema = z.object({
+  imageUrl: z.string().min(1, "An image is required"),
+  productId: z.string().optional().or(z.literal("")),
+  durationMs: z.coerce.number().int().min(1500).max(20000),
+  isActive: z.boolean().default(true),
+});
+
+/** Every slide belongs to the single homepage row; create it if it's missing. */
+async function requireHomepageId() {
+  const existing = await prisma.homepage.findFirst({ select: { id: true } });
+  if (existing) return existing.id;
+
+  const created = await prisma.homepage.create({
+    data: {
+      heroHeading: "SPORTS SHOES",
+      heroSubheading: "Men's collection",
+      heroDescription: "Premium footwear for every step.",
+      heroCtaLabel: "Shop Now",
+      heroCtaUrl: "/shop",
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+export async function createHeroSlide(input: unknown) {
+  const admin = await requirePermission("homepage.write");
+  const parsed = heroSlideSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
+  }
+
+  const homepageId = await requireHomepageId();
+  const last = await prisma.heroSlide.findFirst({
+    where: { homepageId },
+    orderBy: { position: "desc" },
+    select: { position: true },
+  });
+
+  await prisma.heroSlide.create({
+    data: {
+      homepageId,
+      imageUrl: parsed.data.imageUrl,
+      productId: parsed.data.productId || null,
+      durationMs: parsed.data.durationMs,
+      isActive: parsed.data.isActive,
+      position: (last?.position ?? -1) + 1,
+    },
+  });
+
+  await logActivity({ userId: admin.id, action: "hero.slide.created", entity: "HeroSlide" });
+  revalidatePath("/");
+  revalidatePath("/admin/homepage");
+  return { ok: true };
+}
+
+export async function updateHeroSlide(id: string, input: unknown) {
+  const admin = await requirePermission("homepage.write");
+  const parsed = heroSlideSchema.partial().safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
+  }
+
+  const { imageUrl, productId, durationMs, isActive } = parsed.data;
+  await prisma.heroSlide.update({
+    where: { id },
+    data: {
+      ...(imageUrl !== undefined ? { imageUrl } : {}),
+      ...(productId !== undefined ? { productId: productId || null } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+      ...(isActive !== undefined ? { isActive } : {}),
+    },
+  });
+
+  await logActivity({ userId: admin.id, action: "hero.slide.updated", entity: "HeroSlide", meta: { id } });
+  revalidatePath("/");
+  revalidatePath("/admin/homepage");
+  return { ok: true };
+}
+
+export async function deleteHeroSlide(id: string) {
+  const admin = await requirePermission("homepage.write");
+  await prisma.heroSlide.delete({ where: { id } });
+
+  await logActivity({ userId: admin.id, action: "hero.slide.deleted", entity: "HeroSlide", meta: { id } });
+  revalidatePath("/");
+  revalidatePath("/admin/homepage");
+  return { ok: true };
+}
+
+/**
+ * Moves a slide one place up or down.
+ *
+ * The two rows swap positions inside a transaction, so a failure halfway
+ * through can't leave two slides claiming the same slot.
+ */
+export async function moveHeroSlide(id: string, direction: "up" | "down") {
+  await requirePermission("homepage.write");
+
+  const slide = await prisma.heroSlide.findUnique({ where: { id } });
+  if (!slide) return { ok: false, error: "Slide not found" };
+
+  const neighbour = await prisma.heroSlide.findFirst({
+    where: {
+      homepageId: slide.homepageId,
+      position: direction === "up" ? { lt: slide.position } : { gt: slide.position },
+    },
+    orderBy: { position: direction === "up" ? "desc" : "asc" },
+  });
+  if (!neighbour) return { ok: true };
+
+  await prisma.$transaction([
+    prisma.heroSlide.update({ where: { id: slide.id }, data: { position: neighbour.position } }),
+    prisma.heroSlide.update({ where: { id: neighbour.id }, data: { position: slide.position } }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath("/admin/homepage");
+  return { ok: true };
+}

@@ -159,6 +159,8 @@ model ProductColor {
 model ProductSize {
   id        String  @id @default(cuid())
   label     String
+  // Explicit order: size labels are strings, so "10" would sort before "7".
+  position  Int     @default(0)
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   variants  ProductVariant[]
@@ -279,9 +281,10 @@ model Order {
   shippingAddress Json
   couponId       String?
 
-  user    User?       @relation(fields: [userId], references: [id])
-  items   OrderItem[]
-  payment Payment?
+  user        User?        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+  payment     Payment?
+  couponUsage CouponUsage?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,10 +350,20 @@ model Coupon {
 model CouponUsage {
   id       String   @id @default(cuid())
   couponId String
-  userId   String
+  // Null for a guest checkout. Redemptions were previously only recorded for
+  // signed-in customers, which let a guest reuse a capped coupon forever.
+  userId   String?
+  // One redemption per order, enforced by the database rather than by the
+  // order code remembering to check.
+  orderId  String   @unique
   usedAt   DateTime @default(now())
-  coupon   Coupon   @relation(fields: [couponId], references: [id])
-  user     User     @relation(fields: [userId], references: [id])
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([userId])
 }
 
 // ------------------------------------------------------------------ CMS

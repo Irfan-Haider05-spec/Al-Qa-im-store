@@ -6,11 +6,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validations/checkout";
 import { getPaymentProvider } from "@/lib/payments/provider";
+import { calculateTotals, validateCoupon } from "@/lib/orders/totals";
 import type { Prisma } from "@prisma/client";
 
 const GUEST_COOKIE = "se_cart";
-const FREE_SHIP_THRESHOLD = 100;
-const FLAT_SHIP = 5;
 
 // The interactive-transaction client type, exported by the generated Prisma client.
 type TxClient = Prisma.TransactionClient;
@@ -119,34 +118,17 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
 
   const subtotal = priced.reduce((a, l) => a + l.unitPrice * l.quantity, 0);
 
-  // ---- coupon (server-validated) ----
+  // ---- coupon + money: both worked out here, never taken from the client ----
   let discount = 0;
   let couponId: string | null = null;
   if (data.couponCode) {
-    const coupon = await prisma.coupon.findUnique({
-      where: { code: data.couponCode.toUpperCase() },
-    });
-    const now = new Date();
-    const valid =
-      coupon &&
-      coupon.isActive &&
-      (!coupon.expiresAt || coupon.expiresAt > now) &&
-      (!coupon.minOrder || subtotal >= Number(coupon.minOrder));
-    if (!valid) {
-      return { ok: false, error: "Coupon is invalid or expired." };
-    }
-    couponId = coupon!.id;
-    discount =
-      coupon!.type === "PERCENT"
-        ? (subtotal * Number(coupon!.value)) / 100
-        : Number(coupon!.value);
-    discount = Math.min(discount, subtotal);
+    const check = await validateCoupon(data.couponCode, subtotal, user?.id ?? null);
+    if (!check.ok) return { ok: false, error: check.error };
+    discount = check.discount;
+    couponId = check.couponId;
   }
 
-  const shipping =
-    subtotal - discount >= FREE_SHIP_THRESHOLD ? 0 : FLAT_SHIP;
-  const tax = 0; // configurable in Phase 5 settings
-  const total = subtotal - discount + shipping + tax;
+  const { shipping, tax, total } = await calculateTotals(subtotal, discount);
 
   const orderNumber = genOrderNumber();
   const provider = getPaymentProvider(data.paymentMethod);
@@ -212,9 +194,11 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
         },
       });
 
-      if (couponId && user) {
+      // Recorded for guests as well as signed-in customers — a usage cap that
+      // only counts logged-in redemptions is not a cap.
+      if (couponId) {
         await tx.couponUsage.create({
-          data: { couponId, userId: user.id },
+          data: { couponId, userId: user?.id ?? null, orderId: order.id },
         });
       }
 

@@ -1,32 +1,41 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Heart, Minus, Plus, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Minus, Plus, ShoppingBag } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
+import { WishlistButton } from "@/components/product/wishlist-button";
+import { useToast } from "@/components/ui/toast";
 import { formatPrice } from "@/lib/utils/format";
 import { addToCart } from "@/lib/cart/actions";
+import { cn } from "@/lib/utils/cn";
 
-type Variant = {
+export type PanelVariant = {
   id: string;
   colorId: string | null;
   sizeId: string | null;
-  price: string | null;
-  salePrice: string | null;
   inventory: { available: number } | null;
 };
 
-type BuyPanelProps = {
+export type BuyPanelProps = {
+  productId: string;
   productName: string;
   basePrice: number;
   salePrice: number | null;
   colors: { id: string; name: string; hex: string }[];
   sizes: { id: string; label: string }[];
-  variants: Variant[];
+  variants: PanelVariant[];
   rating: { average: number; count: number };
   currency?: string;
+  savedToWishlist?: boolean;
+  /** Lets a parent swap the gallery when the colour changes. */
+  onColorChange?: (colorId: string | null) => void;
+  /** Tighter spacing and no heading, for the homepage Weekly Pick block. */
+  compact?: boolean;
 };
 
 export function BuyPanel({
+  productId,
   productName,
   basePrice,
   salePrice,
@@ -35,67 +44,99 @@ export function BuyPanel({
   variants,
   rating,
   currency = "USD",
+  savedToWishlist = false,
+  onColorChange,
+  compact = false,
 }: BuyPanelProps) {
-  const [colorId, setColorId] = useState<string | null>(
-    colors[0]?.id ?? null
-  );
+  const [colorId, setColorId] = useState<string | null>(colors[0]?.id ?? null);
   const [sizeId, setSizeId] = useState<string | null>(null);
-  const [qty, setQty] = useState(1);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
+  const router = useRouter();
 
-  // The variant matching the current color+size selection.
   const selectedVariant = useMemo(
     () =>
       variants.find(
-        (v) =>
-          (v.colorId ?? null) === (colorId ?? null) &&
-          (v.sizeId ?? null) === (sizeId ?? null)
+        (v) => (v.colorId ?? null) === colorId && (v.sizeId ?? null) === sizeId
       ) ?? null,
     [variants, colorId, sizeId]
   );
 
-  // Which sizes are in stock for the chosen color.
-  const sizeAvailability = useMemo(() => {
+  /** Stock per size for the chosen colour, so sold-out sizes read as sold out. */
+  const stockBySize = useMemo(() => {
     const map = new Map<string, number>();
-    for (const s of sizes) {
-      const v = variants.find(
-        (vv) => vv.colorId === colorId && vv.sizeId === s.id
+    for (const size of sizes) {
+      const variant = variants.find(
+        (v) => v.colorId === colorId && v.sizeId === size.id
       );
-      map.set(s.id, v?.inventory?.available ?? 0);
+      map.set(size.id, variant?.inventory?.available ?? 0);
     }
     return map;
   }, [sizes, variants, colorId]);
 
   const stock = selectedVariant?.inventory?.available ?? 0;
+  const totalStock = useMemo(
+    () => variants.reduce((n, v) => n + (v.inventory?.available ?? 0), 0),
+    [variants]
+  );
   const price = salePrice ?? basePrice;
   const hasDiscount = salePrice != null && salePrice < basePrice;
 
-  function handleAdd() {
-    setMsg(null);
+  const pickColor = (id: string) => {
+    setColorId(id);
+    setSizeId(null);
+    setQuantity(1);
+    setError(null);
+    onColorChange?.(id);
+  };
+
+  /** Shared by both buttons. Resolves to true only when the line was added. */
+  const submit = async () => {
     if (!sizeId) {
-      setMsg({ ok: false, text: "Please select a size." });
-      return;
+      setError("Choose a size first.");
+      return false;
     }
     if (!selectedVariant) {
-      setMsg({ ok: false, text: "That combination is unavailable." });
-      return;
+      setError("That colour and size combination isn't available.");
+      return false;
     }
+
+    const result = await addToCart(selectedVariant.id, quantity);
+    if (!result.ok) {
+      setError(result.error ?? "Could not add to cart.");
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const onAddToCart = () =>
     startTransition(async () => {
-      const res = await addToCart(selectedVariant.id, qty);
-      setMsg(
-        res.ok
-          ? { ok: true, text: "Added to cart." }
-          : { ok: false, text: res.error ?? "Could not add to cart." }
-      );
+      if (await submit()) {
+        toast(`${productName} added to your cart.`);
+        router.refresh();
+      }
     });
-  }
+
+  const onBuyNow = () =>
+    startTransition(async () => {
+      if (await submit()) router.push("/checkout");
+    });
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", compact && "space-y-5")}>
       <div>
-        <h1 className="font-display text-3xl font-bold">{productName}</h1>
-        <div className="mt-3 flex items-center gap-3">
+        {compact ? (
+          <h3 className="font-display text-2xl font-bold">{productName}</h3>
+        ) : (
+          <h1 className="font-display text-4xl font-bold leading-tight">
+            {productName}
+          </h1>
+        )}
+
+        <div className="mt-3 flex items-baseline gap-3">
           <span className="text-2xl font-semibold text-primary">
             {formatPrice(price, currency)}
           </span>
@@ -105,123 +146,147 @@ export function BuyPanel({
             </span>
           )}
         </div>
+
         <div className="mt-2">
           <Rating value={rating.average} count={rating.count} />
         </div>
       </div>
 
-      {/* Colour */}
-      {colors.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-medium">Colour</p>
-          <div className="flex gap-2">
-            {colors.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setColorId(c.id);
-                  setSizeId(null);
-                  setMsg(null);
-                }}
-                aria-label={c.name}
-                aria-pressed={colorId === c.id}
-                className={`grid h-9 w-9 place-items-center rounded-full border-2 ${
-                  colorId === c.id ? "border-primary" : "border-border"
-                }`}
-              >
-                <span
-                  className="h-6 w-6 rounded-full"
-                  style={{ backgroundColor: c.hex }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Size */}
-      {sizes.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-medium">Size</p>
-          <div className="flex flex-wrap gap-2">
-            {sizes.map((s) => {
-              const avail = sizeAvailability.get(s.id) ?? 0;
-              const disabled = avail <= 0;
-              return (
+      <div className={cn("grid gap-6", compact && "grid-cols-2 gap-5")}>
+        {colors.length > 0 && (
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium">Colour</legend>
+            <div className="flex flex-wrap gap-2">
+              {colors.map((c) => (
                 <button
-                  key={s.id}
-                  disabled={disabled}
-                  onClick={() => {
-                    setSizeId(s.id);
-                    setMsg(null);
-                  }}
-                  aria-pressed={sizeId === s.id}
-                  className={`h-10 min-w-[2.75rem] rounded-control border px-3 text-sm ${
-                    sizeId === s.id
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:border-primary"
-                  } ${disabled ? "cursor-not-allowed opacity-40 line-through" : ""}`}
+                  key={c.id}
+                  type="button"
+                  onClick={() => pickColor(c.id)}
+                  title={c.name}
+                  aria-label={c.name}
+                  aria-pressed={colorId === c.id}
+                  className={cn(
+                    "grid h-9 w-9 place-items-center rounded-full border-2 transition-colors",
+                    colorId === c.id ? "border-primary" : "border-border hover:border-primary/50"
+                  )}
                 >
-                  {s.label}
+                  <span
+                    className="h-6 w-6 rounded-full border border-black/5"
+                    style={{ backgroundColor: c.hex }}
+                  />
                 </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          </fieldset>
+        )}
 
-      {/* Stock line */}
-      {sizeId && (
-        <p className="text-sm text-muted-foreground">
-          {stock > 0 ? `${stock} in stock` : "Out of stock"}
-        </p>
-      )}
+        {sizes.length > 0 && (
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium">Size</legend>
+            <div className="flex flex-wrap gap-2">
+              {sizes.map((s) => {
+                const available = stockBySize.get(s.id) ?? 0;
+                const soldOut = available <= 0;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={soldOut}
+                    onClick={() => {
+                      setSizeId(s.id);
+                      setQuantity(1);
+                      setError(null);
+                    }}
+                    aria-pressed={sizeId === s.id}
+                    aria-label={soldOut ? `Size ${s.label} — sold out` : `Size ${s.label}`}
+                    className={cn(
+                      "h-10 min-w-[2.75rem] rounded-control border px-3 text-sm transition-colors",
+                      sizeId === s.id
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border hover:border-primary",
+                      soldOut && "cursor-not-allowed text-muted-foreground line-through opacity-50 hover:border-border"
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+      </div>
 
-      {/* Quantity + actions */}
+      <p className="text-sm" aria-live="polite">
+        {sizeId ? (
+          stock > 5 ? (
+            <span className="text-success">In stock — ships within 24 hours</span>
+          ) : stock > 0 ? (
+            <span className="text-warning">Only {stock} left in this size</span>
+          ) : (
+            <span className="text-danger">Sold out in this size</span>
+          )
+        ) : totalStock > 0 ? (
+          <span className="text-muted-foreground">Select a size to check availability</span>
+        ) : (
+          <span className="text-danger">Currently sold out</span>
+        )}
+      </p>
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center rounded-pill border border-border">
           <button
+            type="button"
             aria-label="Decrease quantity"
-            onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="grid h-11 w-11 place-items-center"
+            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            className="grid h-12 w-12 place-items-center rounded-l-pill transition-colors hover:bg-muted"
           >
             <Minus className="h-4 w-4" />
           </button>
-          <span className="w-8 text-center">{qty}</span>
+          <span className="w-8 text-center text-sm font-medium" aria-live="polite">
+            {quantity}
+          </span>
           <button
+            type="button"
             aria-label="Increase quantity"
-            onClick={() => setQty((q) => Math.min(stock || 99, q + 1))}
-            className="grid h-11 w-11 place-items-center"
+            onClick={() => setQuantity((q) => Math.min(Math.max(stock, 1), q + 1))}
+            disabled={sizeId != null && quantity >= stock}
+            className="grid h-12 w-12 place-items-center rounded-r-pill transition-colors hover:bg-muted disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
           </button>
         </div>
 
         <button
-          onClick={handleAdd}
-          disabled={pending || (sizeId != null && stock <= 0)}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-pill bg-primary px-8 font-medium text-primary-foreground transition-colors hover:bg-primary-deep disabled:opacity-50"
+          type="button"
+          onClick={onAddToCart}
+          disabled={pending || totalStock === 0}
+          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-pill bg-primary px-8 text-sm font-medium text-primary-foreground shadow-card transition-colors hover:bg-primary-deep disabled:opacity-50 sm:flex-none"
         >
-          {pending ? "Adding…" : "Add to Cart"}
+          <ShoppingBag className="h-4 w-4" aria-hidden />
+          {pending ? "Adding…" : "Add to cart"}
         </button>
 
         <button
-          aria-label="Add to wishlist"
-          className="grid h-11 w-11 place-items-center rounded-pill border border-border hover:text-accent"
+          type="button"
+          onClick={onBuyNow}
+          disabled={pending || totalStock === 0}
+          className="inline-flex h-12 items-center justify-center rounded-pill bg-secondary px-8 text-sm font-medium text-secondary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          <Heart className="h-5 w-5" />
+          Buy it now
         </button>
+
+        <WishlistButton
+          productId={productId}
+          productName={productName}
+          initialSaved={savedToWishlist}
+          variant="labelled"
+          className="h-12"
+        />
       </div>
 
-      {msg && (
-        <p
-          role="status"
-          className={`flex items-center gap-2 text-sm ${
-            msg.ok ? "text-success" : "text-danger"
-          }`}
-        >
-          {msg.ok && <Check className="h-4 w-4" />}
-          {msg.text}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
         </p>
       )}
     </div>

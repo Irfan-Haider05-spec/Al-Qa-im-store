@@ -1,442 +1,393 @@
-# Shoe Express — Phase 3 Foundation
+# Shoe Express
 
-A production-ready Next.js (App Router) + PostgreSQL/Prisma e-commerce foundation.
-This is the runnable skeleton: design tokens, database schema, authentication,
-RBAC, base UI, header, footer, and a CMS-driven homepage hero.
+A production-ready e-commerce platform for a premium footwear brand: a
+photographic storefront, a variant-aware catalogue, real orders and inventory,
+and an admin CMS that genuinely drives what customers see.
 
-## What's in this phase
-
-- **Next.js 15 + React 19 + TypeScript (strict)** with the `@/*` path alias
-- **Tailwind** wired to the design tokens from the architecture blueprint
-- **Prisma schema** — all 27 models / 6 enums, variant-aware inventory, CMS models
-- **Auth.js (NextAuth v5)** credentials auth + JWT sessions
-- **RBAC** — role → permission map with a server-side `can()` gate
-- **Middleware** guarding `/admin` and `/account`
-- **Base UI** — Button, Badge, Container
-- **Layout** — Oswald (display) + Inter (body), header with mobile drawer, orange footer
-- **Homepage** hero reading from the `Homepage` CMS row (with a safe fallback)
-- **Seed script** — admin user, site settings, homepage content, categories, a sample product with variants + inventory
-
-Later phases add the storefront pages, admin CMS, payments, email, and polish.
+Built with Next.js 15 (App Router), React 19, TypeScript in strict mode,
+PostgreSQL via Prisma, Auth.js v5, Tailwind and Framer Motion.
 
 ---
 
-## 1. Prerequisites
+## Contents
 
-- Node.js 18.18+ (20 or 22 recommended)
-- A Supabase project (you already have an account)
+1. [What it does](#1-what-it-does)
+2. [Quick start](#2-quick-start)
+3. [Environment variables](#3-environment-variables)
+4. [Database](#4-database)
+5. [Photography pipeline](#5-photography-pipeline)
+6. [Project structure](#6-project-structure)
+7. [Admin and the storefront](#7-admin-and-the-storefront)
+8. [Roles and permissions](#8-roles-and-permissions)
+9. [Payments](#9-payments)
+10. [Email](#10-email)
+11. [Image uploads](#11-image-uploads)
+12. [SEO](#12-seo)
+13. [Accessibility and motion](#13-accessibility-and-motion)
+14. [Security notes](#14-security-notes)
+15. [Production build and deployment](#15-production-build-and-deployment)
+16. [Testing checklist](#16-testing-checklist)
+17. [Known gaps](#17-known-gaps)
 
-## 2. Install
+---
+
+## 1. What it does
+
+**Storefront**
+
+- Animated hero carousel of cut-out product photography, CMS-managed
+- "Popular right now" category pills that re-query the database via the URL
+- Editorial new-arrivals rail, category grid, campaign banner, weekly pick
+- Shop with search, and filters for category, brand, gender, size, colour,
+  price, rating, availability and sale — all server-side, all shareable URLs
+- Product pages with a zoomable gallery, colour/size variants, live stock,
+  reviews with a rating distribution, and related products
+- Cart (database-backed for customers, cookie-token for guests), coupons,
+  checkout, order history, wishlist, addresses and account management
+
+**Admin** (`/admin`)
+
+- Dashboard with real revenue, orders, customers, top products and low stock
+- Products with variants, images, inventory, flags and per-product SEO
+- Categories, brands, inventory adjustments, orders, customers, reviews,
+  coupons, banners, users, site settings and an activity log
+- Homepage CMS: hero copy, hero slides (image, linked product, timing, order,
+  active state), weekly pick and membership block
+
+---
+
+## 2. Quick start
+
+Requires **Node.js 20+** and a PostgreSQL database (these instructions assume
+Supabase; any Postgres works).
 
 ```bash
 npm install
-```
-
-> `postinstall` runs `prisma generate` automatically.
-
-## 3. Get your Supabase connection strings
-
-In the Supabase dashboard:
-
-1. Open your (new) project for Shoe Express.
-2. Click **Connect** in the top bar → **ORMs** → **Prisma**.
-3. Copy the two strings it shows:
-   - **`DATABASE_URL`** — the *Transaction pooler* URL (port **6543**, has `?pgbouncer=true`). Used at runtime.
-   - **`DIRECT_URL`** — the *Direct connection* URL (port **5432**). Used only for migrations.
-
-> Both belong to the same database — they differ only in port/pooling. The dual-URL
-> setup is required so migrations bypass the connection pooler.
-
-## 4. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Fill in:
-
-- `DATABASE_URL` and `DIRECT_URL` — from step 3
-- `AUTH_SECRET` — generate one:
-  ```bash
-  npx auth secret        # writes it for you, or:
-  openssl rand -base64 32
-  ```
-- Leave the image/payment/email placeholders commented out for now.
-
-## 5. Create the database tables
-
-For the first setup, push the schema straight to Supabase:
-
-```bash
-npm run db:push
-```
-
-Or, to track migrations properly (recommended once you're past setup):
-
-```bash
-npm run db:migrate      # prisma migrate dev
-```
-
-## 6. Seed initial data
-
-```bash
-npm run db:seed
-```
-
-This creates:
-
-- an admin — `admin@shoeexpress.test` / `changeme123` (override via `SEED_ADMIN_*` in `.env`)
-- site settings, homepage CMS content, four categories, one sample product with variants + inventory
-
-**Change the admin password after first login.**
-
-## 7. Run
-
-```bash
+cp .env.example .env     # then fill it in — see section 3
+npm run db:push          # create the tables
+npm run assets:build     # download and process the product photography
+npm run db:seed          # catalogue, orders, reviews, CMS content
 npm run dev
 ```
 
-Open http://localhost:3000 — the hero renders from the seeded `Homepage` row.
+Open <http://localhost:3000>. The seed prints the admin credentials it created.
 
 ---
 
-## Scripts
+## 3. Environment variables
 
-| Script            | Does                                    |
-| ----------------- | --------------------------------------- |
-| `npm run dev`     | Start dev server                        |
-| `npm run build`   | `prisma generate` + `next build`        |
-| `npm run start`   | Start production server                 |
-| `npm run db:push` | Push schema to DB (no migration files)  |
-| `npm run db:migrate` | Create + apply a migration           |
-| `npm run db:seed` | Seed initial data                       |
-| `npm run db:studio` | Open Prisma Studio                    |
+| Variable | Required | What it is |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Runtime connection. On Supabase, the **transaction pooler** URL (port 6543, `?pgbouncer=true`) — pooled, so it survives serverless. |
+| `DIRECT_URL` | yes | Migrations only. The **direct** connection (port 5432); `prisma migrate` and `db push` need to bypass the pooler. |
+| `AUTH_SECRET` | yes | Signs session JWTs. Generate with `npx auth secret` or `openssl rand -base64 32`. |
+| `NEXTAUTH_URL` | yes | The site's own origin, e.g. `https://shoeexpress.com`. |
+| `NEXT_PUBLIC_SITE_URL` | yes | Public origin, used for canonical URLs, Open Graph, sitemap and JSON-LD. **Set this in production** or those URLs point at localhost. |
+| `SEED_ADMIN_EMAIL` | no | Email for the admin the seed creates. Default `admin@shoeexpress.test`. |
+| `SEED_ADMIN_PASSWORD` | no | Its password. Default `changeme123` — **change it before any public deployment.** |
+| `NEXT_PUBLIC_SUPABASE_URL` | for uploads | Supabase project URL, for admin image uploads. |
+| `SUPABASE_SERVICE_ROLE_KEY` | for uploads | Service-role secret. Server-only; never referenced from client code. |
+| `SUPABASE_STORAGE_BUCKET` | for uploads | Public bucket name, default `product-images`. |
+| `STRIPE_SECRET_KEY` | no | Not wired up. See [Payments](#9-payments). |
+| `RESEND_API_KEY` | no | Not wired up. See [Email](#10-email). |
 
-## Project structure
+`.env` is git-ignored. Never commit real secrets; put them in your host's
+environment settings instead.
+
+---
+
+## 4. Database
+
+```bash
+npm run db:push      # push the schema (development)
+npm run db:migrate   # create a migration (preferred for production)
+npm run db:seed      # idempotent — safe to re-run
+npm run db:studio    # browse the data
+```
+
+The schema covers users and roles, products with colours, sizes, images and
+variants, variant-level inventory, carts, wishlists, orders, order items,
+payments, addresses, reviews, coupons and coupon usage, plus the CMS models
+(homepage, hero slides, banners, site settings, SEO settings), contact messages
+and an admin activity log.
+
+The seed is **idempotent**: it upserts on natural keys, so re-running it fills
+in anything missing without overwriting edits made in Admin.
+
+**Creating the first admin.** The seed creates one from `SEED_ADMIN_EMAIL` /
+`SEED_ADMIN_PASSWORD`. To promote an existing account instead, sign up normally
+and then run:
+
+```bash
+npx prisma studio      # Users → set role to SUPER_ADMIN
+```
+
+---
+
+## 5. Photography pipeline
+
+No image is hardcoded to a remote URL — everything is served from `/public`.
+
+```bash
+npm run assets:build            # fetch only what's missing
+npm run assets:build -- --force # rebuild everything
+```
+
+`scripts/assets.manifest.json` lists every photograph. The pipeline
+(`scripts/prepare-images.mjs`) downloads each one into a git-ignored cache,
+then writes:
+
+- `public/products/<slug>-1..3.webp` — 1200×1200 gallery shots
+- `public/hero/hero-N.png` — hero shoes with the studio backdrop **keyed out**
+  to transparency, so they float over the brand circle
+- `public/banners/*.webp` and `public/categories/*.webp`
+
+The cut-out uses region growing seeded from the image border: a pixel joins the
+backdrop when it is close both to the neighbour it spread from and to the
+backdrop's overall colour. That follows soft vignettes and cast shadows while
+the shoe's hard edge stops it. Each hero entry has a `tolerance` — raise it if a
+halo of backdrop survives, lower it if the shoe itself starts eroding (white
+shoes on a white seamless need the lowest values). If a backdrop turns out not
+to be keyable, the pipeline says so and ships the untouched photo rather than a
+destroyed one.
+
+**Using your own photography.** Either replace the files in `/public` directly
+(keep the names), or point the manifest at your own sources. Nothing in the app
+needs to change.
+
+The bundled photographs come from [Unsplash](https://unsplash.com) under the
+[Unsplash License](https://unsplash.com/license), which permits free commercial
+use. Swap them for your own brand photography before launch.
+
+---
+
+## 6. Project structure
 
 ```
 app/
-  (store)/        storefront route group (header + footer layout)
-    page.tsx      homepage hero (CMS-driven)
-  admin/          protected admin area (built out in Phase 5)
-  api/auth/       Auth.js route handler
+  (store)/            storefront — home, shop, product, category, cart,
+                      checkout, account, legal, about, contact
+  admin/              admin dashboard and CMS
+  api/                search suggestions, image upload, health, auth
 components/
-  ui/             Button, Badge, Container
-  layout/         Header (+ mobile drawer), Footer
+  animations/         hero carousel, scroll reveals
+  layout/             header, footer, search dialog
+  product/            cards, gallery, buy panel, filters, wishlist
+  store/              homepage sections
+  checkout/  cart/  account/  admin/  ui/
 lib/
-  auth/           Auth.js config, permissions (RBAC), session helpers
-  db/             Prisma client singleton
-  utils/          cn(), formatPrice(), slugify()
+  auth/               Auth.js config (split edge/node), session, permissions
+  db/                 Prisma client singleton
+  products/           catalogue queries, pricing
+  orders/             order placement, totals, coupons
+  cart/  account/  admin/  settings/  storage/  payments/  validations/
 prisma/
-  schema.prisma   full data model
-  seed.ts         initial data
-middleware.ts     edge guard for /admin and /account
+  schema.prisma       the data model
+  catalog.ts          the demo catalogue (what the store sells)
+  seed.ts             how it gets into Postgres
+scripts/
+  assets.manifest.json  every photograph's source
+  prepare-images.mjs    download, optimise, background removal
 ```
-
-## Notes
-
-- **Money** is stored as `Decimal`, never float.
-- **Authorization** is enforced server-side (`can()` / `requirePermission()`), not
-  by hiding buttons.
-- **Homepage** falls back to sensible defaults if the DB isn't seeded yet, so the
-  app renders on first boot.
-
-## Next: Phase 4 — Storefront
-
-Shop page + filters, product detail + variant selection, cart, checkout (COD),
-and the customer account area.
 
 ---
 
-## Phase 4 (part 1) — Storefront catalog
+## 7. Admin and the storefront
 
-Added in this phase:
+Admin is not a separate world — it edits the same rows the storefront reads:
 
-- **Shop page** (`/shop`) — real DB-backed filters (category, gender, price, sale),
-  sorting (featured / newest / price / rating), pagination. All filter state lives
-  in URL query params, so results are shareable and SEO-friendly.
-- **Category pages** (`/category/[slug]`) — pre-filtered listings with SEO metadata.
-- **Product detail** (`/products/[slug]`) — image gallery + thumbnails, colour/size
-  variant selection that maps to a real variant and shows live stock, quantity,
-  add-to-cart, description, specs, reviews, related products, canonical + OG
-  metadata, and **Product JSON-LD** (rating only shown when real reviews exist).
-- **Cart** (`/cart`) — server-action backed, variant-aware, stock-checked on the
-  server. DB-backed cart for logged-in users, secure httpOnly cookie token for
-  guests. Quantity update / remove with live totals and a free-shipping nudge.
-- **Homepage** — now renders Popular Right Now (category pills), New Arrivals from
-  the DB, and the membership CTA.
-- **Expanded seed** — 8 products across 4 categories, each with colour × size
-  variants + inventory, plus a demo customer (`customer@shoeexpress.test` /
-  `customer123`).
+| Change in Admin | Effect |
+| --- | --- |
+| Homepage → Hero heading | The homepage `<h1>` |
+| Homepage → Hero slides | Which shoes rotate, their order and timing |
+| Homepage → Weekly pick | The Weekly Pick block (with a working buy panel) |
+| Products → price / sale price | Card, product page, cart, checkout and order totals |
+| Products → New arrival | Appears in the New Arrival rail |
+| Products → Featured | Appears in Popular right now |
+| Products → Published off | Disappears from the storefront and the sitemap |
+| Categories | Nav, footer, category pages, filters, homepage pills |
+| Banners | The campaign band (respects start/end dates) |
+| Settings → currency / shipping / tax | Every price, the cart, the checkout and new orders |
+| Settings → social links | Footer icons (hidden when unset, rather than linking nowhere) |
 
-### Try it after seeding
+Every mutation calls `revalidatePath`, so changes appear on the next request.
+
+---
+
+## 8. Roles and permissions
+
+`SUPER_ADMIN`, `ADMIN`, `MANAGER`, `EDITOR`, `CUSTOMER`. Roles map to granular
+permissions (`products.write`, `orders.write`, `reviews.moderate`,
+`homepage.write`, `settings.write`, `users.manage`, …) in
+`lib/auth/permissions.ts`.
+
+Enforcement is in two layers, and the second is the one that matters:
+
+1. `middleware.ts` keeps non-admins out of `/admin` routes.
+2. Every server action calls `requirePermission(...)` before it touches data.
+
+Hiding a button is presentation, not security — the server never trusts the UI.
+
+---
+
+## 9. Payments
+
+Checkout depends on the `PaymentProvider` interface in
+`lib/payments/provider.ts`, never on a concrete provider.
+
+**Cash on delivery is the only method wired up.** It is real: the order is
+recorded with payment status `PENDING` and collected on delivery. Card payment
+is *not* faked — asking for an unconfigured method throws rather than pretending
+to succeed.
+
+To add a provider: implement `PaymentProvider`, register it in
+`getPaymentProvider()`, and add the method to the `paymentMethod` enum in
+`lib/validations/checkout.ts`. Checkout itself needs no changes.
+
+---
+
+## 10. Email
+
+There is no email provider configured, and the app does not pretend otherwise —
+no code claims to have sent a message it didn't send. Contact form submissions
+are stored in the `ContactMessage` table and readable in Admin.
+
+To add email, write a service behind a small interface (mirroring
+`lib/payments/provider.ts`), configure `RESEND_API_KEY` or your provider's
+equivalent, and call it from `placeOrder`, the order-status action and the
+registration action.
+
+---
+
+## 11. Image uploads
+
+Admin image uploads go to Supabase Storage. Create a **public** bucket named
+`product-images` (Storage → New bucket), then set `NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET`.
+
+`POST /api/upload` requires an admin role, caps files at 5 MB and accepts only
+JPEG, PNG, WebP and AVIF. Without configuration it returns `501` and says so —
+it does not silently drop the file. Binaries are never stored in Postgres.
+
+For S3 or Cloudinary instead, reimplement `lib/storage/supabase.ts` against the
+same two exports and add the hostname to `images.remotePatterns` in
+`next.config.ts`.
+
+---
+
+## 12. SEO
+
+- Per-page metadata through the Next.js Metadata API, with product and category
+  copy coming from the database and site-wide defaults editable in Admin → SEO
+- Canonical URLs; filtered and searched listings point back at `/shop`
+- JSON-LD: `Product` (with real availability and ratings only when approved
+  reviews exist), `BreadcrumbList`, `CollectionPage`, `Organization`, `WebSite`
+- `sitemap.xml` generated from published products and active categories;
+  `robots.txt` excludes `/admin`, `/account`, `/cart`, `/checkout` and `/api`
+- Semantic HTML with one `<h1>` per page, and product content server-rendered
+  rather than hidden behind client state
+
+Set `NEXT_PUBLIC_SITE_URL` in production — canonical URLs, Open Graph images and
+the sitemap are all built from it.
+
+---
+
+## 13. Accessibility and motion
+
+Semantic landmarks, a skip link, labelled controls, visible focus rings,
+keyboard-navigable gallery and dialogs, `aria-live` on stock and result counts,
+and focus returned to the trigger when an overlay closes.
+
+Scroll reveals are **CSS, not JavaScript animation**, and their hidden state is
+scoped to `[data-js="on"]` — set by a tiny inline script before first paint. If
+that script never runs (a crawler, a blocked bundle), every section renders
+visible. Nothing can strand content at `opacity: 0`.
+
+`prefers-reduced-motion` removes movement while keeping content visible. The
+hero carousel pauses on hover, on focus, when the tab is hidden and when it
+scrolls out of view, and its decorative drift is a compositor-only CSS animation
+rather than a JavaScript loop that would keep the main thread busy forever.
+
+---
+
+## 14. Security notes
+
+- Passwords hashed with bcrypt (cost 12); sign-in compares against a dummy hash
+  for unknown emails so response time doesn't reveal which accounts exist
+- All input validated with Zod, on the server, at the boundary
+- **Prices, discounts, shipping and tax are always recomputed server-side** from
+  the database when an order is placed. The browser's numbers are a preview.
+- Coupons are re-validated at order time — active flag, expiry, minimum order,
+  total usage cap and per-customer cap. Usage is recorded for guest checkouts
+  too, so a cap on a coupon is a real cap.
+- Stock decrements are guarded (`available >= quantity`) inside the same
+  transaction that writes the order, so two simultaneous buyers can't oversell
+- Parameterised queries throughout Prisma; no string-built SQL
+- Security headers (HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`, `Permissions-Policy`) in `next.config.ts`
+- Admin actions written to `AdminActivityLog` with actor, action and entity
+
+---
+
+## 15. Production build and deployment
 
 ```bash
-npm run db:seed
-npm run dev
+npm run build
+npm start
 ```
 
-Then: browse `/shop`, filter by category, open a product, pick a size, add to cart,
-and visit `/cart`.
+Suits any Next.js host; Vercel is the shortest path.
 
-> Product images aren't seeded yet (they arrive with admin image upload in Phase 5).
-> Cards and galleries show a graceful "No image" placeholder until then.
-
-### Still to come in Phase 4 (part 2)
-
-Checkout (COD) with order creation in a DB transaction + inventory decrement, and
-the customer account area (orders, wishlist, addresses, profile).
-
----
-
-## Phase 4 (part 2) — Checkout, orders & account
-
-Added in this phase:
-
-- **Checkout** (`/checkout`) — shipping form (Zod-validated), order summary, COD
-  payment. Order creation runs in a **single DB transaction**: prices are
-  recomputed server-side (client amounts are never trusted), stock is re-checked,
-  inventory is decremented with a guarded `updateMany` (fails safely if an item
-  sold out mid-checkout), the order + items + payment are created, coupon usage is
-  recorded, and the cart is cleared — all atomically.
-- **Payment abstraction** (`lib/payments/provider.ts`) — checkout depends on a
-  `PaymentProvider` interface, not a concrete provider. COD is the wired default;
-  a card provider slots in here later without touching checkout. Unconfigured
-  methods **throw** rather than fake success.
-- **Order confirmation** (`/checkout/success`).
-- **Auth pages** — `/login` and `/register` with server actions (register hashes
-  the password, auto-logs in, and creates a CUSTOMER).
-- **Account area** (`/account`) — overview with stats + recent orders; orders list;
-  order detail (with an **ownership/IDOR guard**); wishlist; address book
-  (add/delete, first address auto-default); profile (update name, change password
-  with current-password verification).
-- **SEO** — dynamic `sitemap.xml` (built from published products + active
-  categories) and `robots.txt` (disallows `/admin`, `/account`, `/cart`,
-  `/checkout`, `/api`).
-- **Header** now shows a live cart count.
-
-### End-to-end test after seeding
-
-```bash
-npm run db:seed
-npm run dev
-```
-
-1. Register at `/register` (or log in as `customer@shoeexpress.test` / `customer123`).
-2. Add a product to cart, go to `/checkout`, fill the form, place the order (COD).
-3. See the confirmation, then `/account/orders` → open the order.
-4. Check that the product's stock dropped by the ordered quantity (Prisma Studio or the PDP).
-
-### Security properties in this phase
-
-- Order totals, discounts, and stock are **always** recomputed server-side.
-- Inventory decrement is transactional and guarded against overselling.
-- Order detail enforces ownership (a user cannot view another user's order).
-- Coupons are validated server-side (active, not expired, min-order met).
-
-## Next: Phase 5 — Admin CMS
-
-Dashboard, product/category/inventory CRUD, order management (status + tracking),
-reviews moderation, coupons, homepage CMS, banners, SEO settings, image upload,
-and the activity log.
+1. Push the repository and import it.
+2. Add every variable from section 3 to the project's environment settings.
+   `NEXT_PUBLIC_SITE_URL` must be the real domain.
+3. Use a **pooled** `DATABASE_URL` — serverless functions exhaust direct
+   connections quickly.
+4. Run migrations against production:
+   ```bash
+   DATABASE_URL=... DIRECT_URL=... npx prisma migrate deploy
+   ```
+5. Seed once if you want the demo catalogue: `npm run db:seed`.
+6. **Change the seeded admin password**, or delete the account and promote your
+   own.
+7. Commit the generated `/public` images, or run `npm run assets:build` as part
+   of the build.
 
 ---
 
-## Phase 5 (part 1) — Admin CMS: operational core
+## 16. Testing checklist
 
-Added in this phase:
+Verified during development:
 
-- **Admin shell** (`/admin`) — separate layout (outside the storefront group, so no
-  store header/footer), dark sidebar with all sections, top bar with role badge and
-  logout. Role-guarded by `requireAdmin()` plus per-action `requirePermission()`.
-- **Dashboard** (`/admin/dashboard`) — real metrics from the DB: revenue (excludes
-  cancelled/refunded), orders, pending, customers, products, recent orders, top
-  products (grouped from order items), and low-stock list. No hardcoded numbers.
-- **Products** — full CRUD: list with search, create, edit, publish/unpublish,
-  delete (with confirm). Slug uniqueness enforced. Every write is permission-checked
-  and written to the activity log. Editing a product's price/flags updates the
-  storefront (via `revalidatePath`).
-- **Categories** (`/admin/categories`) — inline create, activate/deactivate, delete
-  (blocked if the category still has products).
-- **Inventory** (`/admin/inventory`) — per-variant editable stock with in/low/out
-  status badges; saves via a permission-checked action.
-- **Orders** — list with status filter tabs; detail page with items, totals,
-  customer + shipping address, and controls to change status, set tracking, and add
-  internal notes. **Status changes are transactional**: moving an order to
-  Cancelled/Refunded returns stock; moving back out takes it again; refunds sync the
-  payment record.
-- **Customers** (`/admin/customers`) — read-only list with order count and lifetime
-  value.
+- Registration, login, logout; case-insensitive email matching
+- Browsing, search (name, SKU, tag, brand, category), every filter and sort
+- Variant selection with per-size stock; sold-out sizes disabled
+- Add to cart, quantity limits, remove; guest cart persists via cookie
+- Coupon validation, checkout, order creation, stock decrement, order history
+- Unauthenticated `/admin/*` and `/account/*` redirect to login
+- `POST /api/upload` returns 403 without an admin role
+- Over-quantity stock decrements are refused by the database guard
+- Layout holds from 320 px to 1920 px with no horizontal overflow
 
-### Admin ↔ storefront wiring (the mandatory requirement)
-
-- Edit a product's price in admin → storefront reflects it (revalidation).
-- Set `New Arrival` / `Weekly Pick` flags → drives the homepage sections.
-- Update inventory → PDP stock and checkout availability change.
-- Change order status → customer sees it in their account.
-
-### Access
-
-Log in as the seeded admin (`admin@shoeexpress.test` / `changeme123`) and go to
-`/admin`. A CUSTOMER role is redirected away by middleware.
-
-### Permissions in play
-
-- `products.read/write/delete`, `orders.read/write`, `customers.read` are enforced
-  server-side in every action — hiding a sidebar link is never the security boundary.
-
-## Next: Phase 5 (part 2)
-
-Reviews moderation, coupons CRUD, homepage CMS editor, banners, SEO settings,
-site settings, image upload (Supabase Storage), and the activity-log viewer.
+Worth re-running after changes: place an order, confirm the order row's totals
+match what checkout displayed, and confirm inventory dropped by the right amount.
 
 ---
 
-## Phase 5 (part 2) — Admin CMS: content, config & media
+## 17. Known gaps
 
-Added in this phase:
+Honest list of what is *not* done:
 
-- **Reviews moderation** (`/admin/reviews`) — approve / unapprove / delete, with
-  All/Pending/Approved tabs. Approving a review makes it (and its rating) appear on
-  the product page.
-- **Coupons** (`/admin/coupons`) — create percent/fixed coupons with min-order,
-  usage limit, per-user limit, and expiry; toggle active; delete. (Server-side
-  validation at checkout was already wired in Phase 4.)
-- **Homepage CMS** (`/admin/homepage`) — edit hero, weekly-pick (with product
-  picker), and membership CTA. Saving updates the live storefront.
-- **Banners** (`/admin/banners`) — create with image upload, schedule (start/end),
-  toggle active, delete.
-- **SEO** (`/admin/seo`) — per-page (home/shop/about/contact) title, description,
-  OG image.
-- **Settings** (`/admin/settings`) — store name, contact, currency, shipping/tax,
-  social links.
-- **Users** (`/admin/users`) — change roles, with a guard against demoting the last
-  super admin.
-- **Activity log** (`/admin/activity`) — last 100 admin actions with who/what/when.
-- **Image upload** — `POST /api/upload` (admin-guarded, 5MB limit, image types only)
-  → Supabase Storage. Reusable `ImageUpload` component with a URL-paste fallback.
-  Product edit page now has a full image gallery manager (add, remove, set primary).
-
-### Supabase Storage setup (for image upload)
-
-1. Supabase dashboard → **Storage** → **New bucket** → name it `product-images`,
-   mark it **Public**.
-2. In `.env` set:
-   - `NEXT_PUBLIC_SUPABASE_URL` — Project Settings → API → Project URL
-   - `SUPABASE_SERVICE_ROLE_KEY` — Project Settings → API → `service_role` secret
-     (server-only; never exposed to the browser)
-   - `SUPABASE_STORAGE_BUCKET` — `product-images`
-3. Restart `npm run dev`. Until this is set, upload returns a clear "not configured"
-   message and you can still paste image URLs directly.
-
-### The admin now fully controls the storefront
-
-Products, prices, inventory, categories, hero, weekly pick, banners, coupons,
-reviews, SEO and settings are all DB/CMS-driven. Editing any of them in `/admin`
-updates the public site.
-
-## Next: Phase 6 — Polish
-
-Hero product animation (Framer Motion, reduced-motion aware), page/route
-transitions, product-card and filter animations, responsive passes, accessibility
-sweep, loading/error/empty states, and performance.
-
----
-
-## Phase 6 & 7 — Polish + Production readiness
-
-### Polish (Phase 6)
-- **Hero animation** — `HeroCycler` cross-fades hero product images with a premium
-  ease; respects `prefers-reduced-motion` (static fallback) and works with 0/1/many
-  images. Hero images are managed from Admin → Homepage (hero slides).
-- **Scroll-in animations** — `FadeIn` wraps homepage sections; reduced-motion safe.
-- **Loading states** — route-level skeletons for shop and product pages; global,
-  admin loading spinners; reusable `Skeleton` / `ProductCardSkeleton`.
-- **Error & not-found** — branded global `not-found`, global `error` boundary, and
-  admin `error` boundary.
-- **Empty states** — cart, wishlist, orders, shop no-results, admin tables.
-- **Accessibility** — skip-to-content link, `<main>` landmark, focus-visible rings,
-  aria labels on icon buttons, keyboard-friendly controls, alt text on images,
-  global reduced-motion handling.
-- **New pages** — `/contact` (stores messages) and `/about`.
-
-### Production readiness (Phase 7)
-- **Security headers** in `next.config.ts` (HSTS, X-Frame-Options, nosniff,
-  Referrer-Policy, Permissions-Policy); `poweredByHeader` off.
-- **Auth** `trustHost: true` for platform deploys.
-- **Health check** — `/api/health` returns DB status for uptime monitors.
-- **Image optimization** — AVIF/WebP formats, remote patterns locked down.
-- **Seed** now includes hero-ready content, sample approved reviews (so ratings
-  render), and a `WELCOME20` coupon.
-- **Docs** — `DEPLOYMENT.md` (Vercel + Supabase, step by step) and `TESTING.md`
-  (full manual QA checklist).
-
-### Verification status
-- `tsc --noEmit`: **0 errors** (strict mode)
-- `next lint`: **0 warnings/errors** (core-web-vitals ruleset)
-- Final `npm run build` must be run on your machine/CI — Prisma downloads its query
-  engine at generate time, which a restricted sandbox can't fetch. See DEPLOYMENT.md
-  §1; on any normal environment `npm run build` completes the verification.
-
-### Go-live in three commands (after filling `.env`)
-```bash
-npm install
-npm run build      # verifies the production build
-npm run db:push && npm run db:seed   # first-time DB setup
-```
-Then deploy to Vercel per **DEPLOYMENT.md**.
-
----
-
-## Selling anything, not just shoes
-
-The store is product-type agnostic. Nav categories, footer, and store name are all
-**pulled from the database**, so adding a new product type (trousers, shirts,
-jackets…) needs **no code changes** — just admin actions:
-
-1. **Admin → Categories** → add the category (e.g. "Shirts", "Trousers").
-   It appears in the header drawer, footer, and homepage pills automatically.
-2. **Admin → Products → New** → create the product, pick the new category, set
-   sizes in whatever scheme fits (`S/M/L/XL` for shirts, `30/32/34` for trousers,
-   `8/9/10` for shoes), add colours, prices, and flags.
-3. **Admin → product → Images** → upload photos.
-4. **SEO is automatic** — every published product gets canonical + OpenGraph tags,
-   Product JSON-LD, and an entry in `/sitemap.xml`. Per-product SEO title/description
-   can be overridden on the product form; per-category SEO on the category.
-5. Publish → it's live, searchable, filterable, and in the sitemap.
-
-Sizes are free-text labels per product, so any sizing scheme works without a schema
-change. Attributes like material or fit can go in the product **tags** (already
-searchable). If you later want dedicated material/fit filters, that's a small
-additive `ProductAttribute` model — ask when you need it.
-
-To rebrand from "Shoe Express" to a general store name, set it in
-**Admin → Settings → Store name** (drives the header wordmark and footer) — no code
-change. The seed's default text is just a starting point.
-
----
-
-## Dummy images (and replacing them with real photos)
-
-The seed ships **branded placeholder images** so the store looks complete out of the
-box — every product has a 3-image gallery, and the hero has 3 slides. These are
-clean SVGs in `public/products/`, `public/hero/` (generated by
-`scripts/generate-images.mjs`, re-runnable via `npm run gen:images`). They're
-self-contained — no external URLs that can break.
-
-They render with a product glyph (shoe / shirt / trousers), the category label, and
-the product name on the brand palette.
-
-### Replace with your real photos — two easy ways
-
-**Per product (recommended, no code):**
-1. Admin → Products → open a product → **Images**.
-2. Remove a placeholder, **Upload** your real photo (goes to Supabase Storage),
-   set the primary image. Done — the storefront updates immediately.
-
-**Bulk (before first seed):** drop your real images into `public/products/` using
-the same names (`<slug>-1.svg` → or change the seed URLs to `.jpg`), then seed.
-
-The hero slides are managed in Admin → Homepage. Everything is editable without
-touching code — the placeholders are just a starting point you overwrite with real
-data as stock arrives.
+- **No automated test suite.** Testing so far has been manual. A store handling
+  real money should have integration tests around `placeOrder` first.
+- **Card payments and email are unconfigured**, by design — both sit behind
+  interfaces, neither is faked.
+- **Legal pages are a starting point, not legal advice.** Passages marked
+  `[REVIEW]` (company details in the imprint especially) need a lawyer before
+  launch.
+- **Tax is a single flat rate.** `calculateTotals` is the one place to change
+  for per-zone or per-product tax.
+- **Shipping is flat plus a free-delivery threshold.** Zones would slot into the
+  same function.
+- **Product images are stock photography.** Replace them with real product shots
+  before selling anything.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Shoe Express">
+  <rect width="64" height="64" rx="14" fill="#0d7f8f"/>
+  <!-- Low-top sneaker in side profile: heel collar on the left, toe box low on
+       the right, sitting on a dark sole bar. Kept to a few heavy shapes so it
+       still reads as a shoe at 16px. -->
+  <path
+    d="M11 43V32.5c0-1.4 1.1-2.5 2.5-2.5H17c1.3 0 2.5.6 3.2 1.7l2.1 3.2 8.4-1.9 5.5-7.8c.9-1.3 2.7-1.5 3.9-.5 3.6 3.1 7.9 5.2 12.5 6.2 2.6.6 4.4 2.9 4.4 5.5V43z"
+    fill="#ffffff"/>
+  <rect x="9" y="43" width="46" height="6" rx="3" fill="#12232a"/>
+  <path d="M31.8 33.2c1.6 1.9 3.9 2.9 6.4 2.8" stroke="#0d7f8f" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+  <path d="M36.4 27.4c1.6 1.9 4 2.9 6.5 2.8" stroke="#0d7f8f" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+</svg>

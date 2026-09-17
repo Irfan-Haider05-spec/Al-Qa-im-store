@@ -18,7 +18,12 @@ export async function registerUser(input: {
   }
   const { name, email, password } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // Same case-insensitive rule the sign-in lookup uses, so a second
+  // registration with different capitalisation is caught as a duplicate
+  // rather than creating a shadow account nobody can log into.
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
   if (existing) {
     return { ok: false, error: "An account with this email already exists." };
   }

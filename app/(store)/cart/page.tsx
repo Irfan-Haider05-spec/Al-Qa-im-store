@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
 import { getCart } from "@/lib/cart/get-cart";
+import { calculateTotals } from "@/lib/orders/totals";
+import { getSiteSettings } from "@/lib/settings/site";
 import { CartLineItem } from "@/components/cart/cart-line-item";
 import { formatPrice } from "@/lib/utils/format";
 
@@ -10,11 +12,11 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-const FREE_SHIP_THRESHOLD = 100;
-const FLAT_SHIP = 5;
-
 export default async function CartPage() {
-  const { lines, subtotal, itemCount } = await getCart();
+  const [{ lines, subtotal, itemCount }, settings] = await Promise.all([
+    getCart(),
+    getSiteSettings(),
+  ]);
 
   if (lines.length === 0) {
     return (
@@ -36,8 +38,9 @@ export default async function CartPage() {
     );
   }
 
-  const shipping = subtotal >= FREE_SHIP_THRESHOLD ? 0 : FLAT_SHIP;
-  const total = subtotal + shipping;
+  // Same helper the checkout and the order itself use, so the number quoted
+  // here is the number that gets charged.
+  const { shipping, tax, total, freeShippingGap } = await calculateTotals(subtotal);
 
   return (
     <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8">
@@ -57,21 +60,27 @@ export default async function CartPage() {
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Subtotal</dt>
-              <dd>{formatPrice(subtotal)}</dd>
+              <dd>{formatPrice(subtotal, settings.currency)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Shipping</dt>
-              <dd>{shipping === 0 ? "Free" : formatPrice(shipping)}</dd>
+              <dd>{shipping === 0 ? "Free" : formatPrice(shipping, settings.currency)}</dd>
             </div>
-            {shipping > 0 && (
+            {freeShippingGap != null && (
               <p className="text-xs text-muted-foreground">
-                Add {formatPrice(FREE_SHIP_THRESHOLD - subtotal)} more for free
-                shipping.
+                Add {formatPrice(freeShippingGap, settings.currency)} more for free
+                delivery.
               </p>
+            )}
+            {tax > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Tax</dt>
+                <dd>{formatPrice(tax, settings.currency)}</dd>
+              </div>
             )}
             <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
               <dt>Total</dt>
-              <dd>{formatPrice(total)}</dd>
+              <dd>{formatPrice(total, settings.currency)}</dd>
             </div>
           </dl>
 
