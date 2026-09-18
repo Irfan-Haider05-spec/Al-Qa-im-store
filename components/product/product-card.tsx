@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Rating } from "@/components/ui/rating";
 import { WishlistButton } from "@/components/product/wishlist-button";
@@ -39,18 +40,13 @@ export function ProductCard({
   const [primary, secondary] = product.images;
   const stock = product.variants ? totalStock(product.variants) : null;
   const soldOut = stock === 0;
+  const lowStock = stock != null && stock > 0 && stock <= 5;
+  const href = `/products/${product.slug}`;
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-card border border-border bg-background transition-all duration-300 hover:-translate-y-1 hover:shadow-hover">
-      <div className="relative aspect-square overflow-hidden bg-muted">
-        <Link
-          href={`/products/${product.slug}`}
-          className="absolute inset-0"
-          // The whole card is one link target; the heading repeats the name for
-          // assistive tech, so the image link itself stays out of the tab order
-          // description.
-          aria-label={product.name}
-        >
+    <article className="group relative flex flex-col">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-card bg-muted">
+        <Link href={href} className="absolute inset-0" aria-label={product.name}>
           {primary ? (
             <>
               <Image
@@ -59,90 +55,96 @@ export function ProductCard({
                 fill
                 priority={priority}
                 sizes={sizes}
-                className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                className="object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]"
               />
-              {/* Second shot fades in over the first on hover — a real gallery
-                  peek rather than a zoom on the same photo. */}
+              {/* Second shot fades in over the first on hover — a real
+                  gallery peek, not a zoom of the same photo. */}
               {secondary && (
                 <Image
                   src={secondary.url}
                   alt=""
                   fill
                   sizes={sizes}
-                  className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 motion-reduce:transition-none"
+                  className="object-cover opacity-0 transition-opacity duration-700 group-hover:opacity-100"
                 />
               )}
             </>
           ) : (
-            <div className="grid h-full place-items-center text-sm text-muted-foreground">
-              No image
-            </div>
+            <span className="grid h-full place-items-center text-sm text-muted-foreground">No image</span>
           )}
         </Link>
 
-        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-2">
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
           {soldOut ? (
             <Badge tone="muted">Sold out</Badge>
           ) : (
             <>
-              {product.isNewArrival && <Badge tone="primary">New</Badge>}
               {hasDiscount && <Badge tone="accent">−{discountPct}%</Badge>}
+              {product.isNewArrival && <Badge tone="primary">New</Badge>}
             </>
           )}
         </div>
 
         <div className="absolute right-3 top-3">
-          <WishlistButton
-            productId={product.id}
-            productName={product.name}
-            initialSaved={saved}
-          />
+          <WishlistButton productId={product.id} productName={product.name} initialSaved={saved} />
         </div>
+
+        {/* "View" bar slides up on hover (always visible on touch). */}
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-hidden
+          className="absolute inset-x-3 bottom-3 hidden items-center justify-between rounded-pill bg-ink/90 md:flex px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-ivory backdrop-blur transition duration-300 md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+        >
+          {soldOut ? "View details" : "Choose options"}
+          <ArrowUpRight className="h-4 w-4 text-gold-light" />
+        </Link>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className="flex flex-1 flex-col pt-4">
         {product.category && (
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            {product.category.name}
-          </p>
+          <p className="eyebrow text-[0.62rem] text-gold-ink">{product.category.name}</p>
         )}
 
-        <h3 className="font-medium leading-snug">
-          <Link
-            href={`/products/${product.slug}`}
-            className="transition-colors hover:text-primary"
-          >
+        <h3 className="mt-1.5 font-display text-lg leading-snug">
+          <Link href={href} className="transition-colors hover:text-gold-ink">
             {product.name}
           </Link>
         </h3>
 
-        <Rating value={average} count={count} size={14} />
+        <div className="mt-1.5">
+          <Rating value={average} count={count} size={13} />
+        </div>
 
-        <div className="mt-auto flex items-baseline gap-2 pt-1">
-          <span className="font-semibold">{formatPrice(price, currency)}</span>
-          {hasDiscount && (
-            <span className="text-sm text-muted-foreground line-through">
-              {formatPrice(base, currency)}
+        <div className="mt-auto flex items-baseline justify-between gap-3 pt-3">
+          <p className="flex items-baseline gap-2">
+            <span className="font-semibold">{formatPrice(price, currency)}</span>
+            {hasDiscount && (
+              <span className="text-sm text-muted-foreground line-through">
+                {formatPrice(base, currency)}
+              </span>
+            )}
+          </p>
+
+          {product.colors.length > 0 && (
+            <span className="flex items-center gap-1" aria-label={`${product.colors.length} colours`}>
+              {product.colors.slice(0, 4).map((c) => (
+                <span
+                  key={c.name}
+                  title={c.name}
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
+              {product.colors.length > 4 && (
+                <span className="text-xs text-muted-foreground">+{product.colors.length - 4}</span>
+              )}
             </span>
           )}
         </div>
 
-        {product.colors.length > 0 && (
-          <div className="flex items-center gap-1.5 pt-1">
-            {product.colors.slice(0, 5).map((c) => (
-              <span
-                key={c.name}
-                title={c.name}
-                className="h-4 w-4 rounded-full border border-border"
-                style={{ backgroundColor: c.hex }}
-              />
-            ))}
-            {product.colors.length > 5 && (
-              <span className="text-xs text-muted-foreground">
-                +{product.colors.length - 5}
-              </span>
-            )}
-          </div>
+        {lowStock && !soldOut && (
+          <p className="mt-2 text-xs font-medium text-warning">Only {stock} left</p>
         )}
       </div>
     </article>

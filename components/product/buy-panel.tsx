@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, ShoppingBag } from "lucide-react";
+import { Minus, Plus, RotateCcw, ShieldCheck, ShoppingBag, Truck } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
 import { WishlistButton } from "@/components/product/wishlist-button";
 import { useToast } from "@/components/ui/toast";
@@ -76,6 +77,9 @@ export function BuyPanel({
     return map;
   }, [sizes, variants, colorId]);
 
+  // One-size products (a belt, a cap) have no size to pick.
+  const needsSize = sizes.length > 0;
+  const sizeChosen = !needsSize || sizeId != null;
   const stock = selectedVariant?.inventory?.available ?? 0;
   const totalStock = useMemo(
     () => variants.reduce((n, v) => n + (v.inventory?.available ?? 0), 0),
@@ -94,12 +98,16 @@ export function BuyPanel({
 
   /** Shared by both buttons. Resolves to true only when the line was added. */
   const submit = async () => {
-    if (!sizeId) {
+    if (!sizeChosen) {
       setError("Choose a size first.");
       return false;
     }
     if (!selectedVariant) {
-      setError("That colour and size combination isn't available.");
+      setError(
+        needsSize
+          ? "That colour and size combination isn't available."
+          : "This option isn't available right now."
+      );
       return false;
     }
 
@@ -129,15 +137,15 @@ export function BuyPanel({
     <div className={cn("space-y-6", compact && "space-y-5")}>
       <div>
         {compact ? (
-          <h3 className="font-display text-2xl font-bold">{productName}</h3>
+          <h3 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">{productName}</h3>
         ) : (
-          <h1 className="font-display text-4xl font-bold leading-tight">
+          <h1 className="font-display text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.015em]">
             {productName}
           </h1>
         )}
 
         <div className="mt-3 flex items-baseline gap-3">
-          <span className="text-2xl font-semibold text-primary">
+          <span className="text-2xl font-semibold text-foreground">
             {formatPrice(price, currency)}
           </span>
           {hasDiscount && (
@@ -182,7 +190,15 @@ export function BuyPanel({
 
         {sizes.length > 0 && (
           <fieldset>
-            <legend className="mb-2 text-sm font-medium">Size</legend>
+            <legend className="mb-2 flex w-full items-center justify-between text-sm font-medium">
+              Size
+              <Link
+                href="/about#sizes"
+                className="text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Size guide
+              </Link>
+            </legend>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const available = stockBySize.get(s.id) ?? 0;
@@ -217,13 +233,17 @@ export function BuyPanel({
       </div>
 
       <p className="text-sm" aria-live="polite">
-        {sizeId ? (
+        {sizeChosen ? (
           stock > 5 ? (
             <span className="text-success">In stock — ships within 24 hours</span>
           ) : stock > 0 ? (
-            <span className="text-warning">Only {stock} left in this size</span>
+            <span className="text-warning">
+              Only {stock} left{needsSize ? " in this size" : ""}
+            </span>
           ) : (
-            <span className="text-danger">Sold out in this size</span>
+            <span className="text-danger">
+              {needsSize ? "Sold out in this size" : "Sold out in this colour"}
+            </span>
           )
         ) : totalStock > 0 ? (
           <span className="text-muted-foreground">Select a size to check availability</span>
@@ -249,7 +269,7 @@ export function BuyPanel({
             type="button"
             aria-label="Increase quantity"
             onClick={() => setQuantity((q) => Math.min(Math.max(stock, 1), q + 1))}
-            disabled={sizeId != null && quantity >= stock}
+            disabled={sizeChosen && quantity >= stock}
             className="grid h-12 w-12 place-items-center rounded-r-pill transition-colors hover:bg-muted disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
@@ -270,7 +290,7 @@ export function BuyPanel({
           type="button"
           onClick={onBuyNow}
           disabled={pending || totalStock === 0}
-          className="inline-flex h-12 items-center justify-center rounded-pill bg-secondary px-8 text-sm font-medium text-secondary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="bg-gold-gradient inline-flex h-12 items-center justify-center rounded-pill px-8 text-sm font-semibold text-ink shadow-gold transition-[filter] hover:brightness-105 disabled:opacity-50"
         >
           Buy it now
         </button>
@@ -288,6 +308,21 @@ export function BuyPanel({
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
+      )}
+
+      {!compact && (
+        <ul className="grid gap-3 border-t border-border pt-6 text-sm text-muted-foreground sm:grid-cols-3">
+          {[
+            { icon: Truck, label: "Ships in 24 hours" },
+            { icon: RotateCcw, label: "30-day returns" },
+            { icon: ShieldCheck, label: "Secure checkout" },
+          ].map(({ icon: Icon, label }) => (
+            <li key={label} className="flex items-center gap-2.5">
+              <Icon className="h-4 w-4 shrink-0 text-gold-ink" aria-hidden />
+              {label}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

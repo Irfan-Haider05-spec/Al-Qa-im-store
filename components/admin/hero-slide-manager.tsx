@@ -45,7 +45,7 @@ export function HeroSlideManager({
   const [draft, setDraft] = useState({
     imageUrl: "",
     productId: "",
-    durationMs: 4200,
+    durationMs: 1000,
     isActive: true,
   });
 
@@ -65,7 +65,7 @@ export function HeroSlideManager({
       <div>
         <h2 className="font-display text-lg font-semibold">Hero slides</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          The rotating shoes in the homepage hero. Transparent PNG cut-outs look
+          The rotating products in the homepage hero. Transparent PNG cut-outs look
           best — {slides.filter((s) => s.isActive).length} active.
         </p>
       </div>
@@ -116,7 +116,7 @@ export function HeroSlideManager({
               </label>
               <input
                 type="number"
-                min={1500}
+                min={600}
                 max={20000}
                 step={100}
                 defaultValue={slide.durationMs}
@@ -196,7 +196,7 @@ export function HeroSlideManager({
         <h3 className="mb-3 text-sm font-semibold">Add a slide</h3>
         <div className="flex flex-wrap items-end gap-4">
           <ImageUpload
-            label="Shoe cut-out"
+            label="Product cut-out"
             value={draft.imageUrl}
             onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
           />
@@ -221,7 +221,7 @@ export function HeroSlideManager({
             <label className="mb-1 block text-sm font-medium">Hold (ms)</label>
             <input
               type="number"
-              min={1500}
+              min={600}
               max={20000}
               step={100}
               className={input}
@@ -239,7 +239,7 @@ export function HeroSlideManager({
               run(async () => {
                 const result = await createHeroSlide(draft);
                 if (result.ok) {
-                  setDraft({ imageUrl: "", productId: "", durationMs: 4200, isActive: true });
+                  setDraft({ imageUrl: "", productId: "", durationMs: 1000, isActive: true });
                 }
                 return result;
               }, "Slide added.")

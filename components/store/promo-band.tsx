@@ -12,59 +12,47 @@ export type PromoBanner = {
 };
 
 /**
- * The full-bleed campaign band: oversized display type set behind the product
- * photograph, the way the reference stacks "BLACK FRIDAY" behind the shoe.
- *
- * The headline is split across two lines of outline type purely as decoration —
- * the readable heading sits in the foreground, so screen readers and crawlers
- * get the words once, not three times.
+ * The campaign band: a full-bleed photograph fading into ink, with the copy
+ * set over the dark side. Content comes from Admin → Banners and respects the
+ * banner's start and end dates.
  */
 export function PromoBand({ banner }: { banner: PromoBanner }) {
   return (
-    <section className="relative overflow-hidden bg-primary text-primary-foreground">
-      {/* Decorative oversized wordmark. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 grid select-none place-items-center overflow-hidden"
-      >
-        <span className="whitespace-nowrap font-display text-[22vw] font-bold leading-none tracking-tight text-white/10 sm:text-[16vw]">
-          {banner.title.split(" ").slice(0, 2).join(" ")}
-        </span>
-      </span>
+    <section className="surface-dark relative isolate overflow-hidden">
+      <div className="absolute inset-y-0 right-0 -z-10 w-full lg:w-[62%]">
+        <Image
+          src={banner.imageUrl}
+          alt=""
+          fill
+          sizes="(max-width: 1024px) 100vw, 62vw"
+          className="object-cover opacity-60 lg:opacity-90"
+        />
+        {/* Fades the photo into the ink so the edge never shows. */}
+        <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink via-ink/60 to-transparent" />
+        <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
+      </div>
 
-      <div className="relative mx-auto grid max-w-content items-center gap-8 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-2">
-        <FadeIn>
-          <div className="max-w-md">
-            <h2 className="font-display text-4xl font-bold leading-[1.05] sm:text-5xl">
-              {banner.title}
-            </h2>
-            {banner.subtitle && (
-              <p className="mt-4 text-base text-primary-foreground/85">
-                {banner.subtitle}
-              </p>
-            )}
-            {banner.ctaUrl && (
-              <Link
-                href={banner.ctaUrl}
-                className="mt-8 inline-flex h-12 items-center gap-2 rounded-pill bg-background px-8 text-sm font-medium text-foreground shadow-card transition-transform hover:-translate-y-0.5"
-              >
-                {banner.ctaLabel ?? "Shop now"}
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-            )}
-          </div>
-        </FadeIn>
-
-        <FadeIn delay={0.1}>
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-card shadow-hover">
-            <Image
-              src={banner.imageUrl}
-              alt=""
-              fill
-              sizes="(max-width: 1024px) 92vw, 46vw"
-              className="object-cover"
-            />
-          </div>
+      <div className="mx-auto max-w-content px-5 py-24 sm:px-8 lg:px-12 lg:py-36">
+        <FadeIn className="max-w-lg">
+          <p className="eyebrow flex items-center gap-3 text-gold-light">
+            <span className="h-px w-7 bg-gold/70" aria-hidden />
+            Limited time
+          </p>
+          <h2 className="mt-5 font-display text-[clamp(2.4rem,5vw,4rem)] font-medium leading-[1.02] tracking-[-0.02em] text-ivory">
+            {banner.title}
+          </h2>
+          {banner.subtitle && (
+            <p className="mt-5 max-w-md leading-relaxed text-ivory/70">{banner.subtitle}</p>
+          )}
+          {banner.ctaUrl && (
+            <Link
+              href={banner.ctaUrl}
+              className="group mt-10 inline-flex h-14 items-center gap-3 rounded-pill bg-gold-gradient px-8 text-sm font-semibold uppercase tracking-[0.14em] text-ink shadow-gold transition-transform hover:-translate-y-0.5"
+            >
+              {banner.ctaLabel ?? "Shop now"}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
+            </Link>
+          )}
         </FadeIn>
       </div>
     </section>

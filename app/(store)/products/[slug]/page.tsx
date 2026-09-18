@@ -8,6 +8,9 @@ import { getWishlistProductIds } from "@/lib/account/wishlist-actions";
 import { ProductDetail } from "@/components/product/product-detail";
 import { ProductCard } from "@/components/product/product-card";
 import { Rating } from "@/components/ui/rating";
+import { ReviewForm } from "@/components/product/review-form";
+import { getCurrentUser } from "@/lib/auth/session";
+import { getReviewEligibility } from "@/lib/reviews/eligibility";
 
 type Params = { slug: string };
 
@@ -55,11 +58,13 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [related, settings, saved] = await Promise.all([
+  const [related, settings, saved, viewer] = await Promise.all([
     getRelatedProducts(product.categoryId, product.id),
     getSiteSettings(),
     getWishlistProductIds(),
+    getCurrentUser(),
   ]);
+  const reviewState = await getReviewEligibility(product.id, viewer?.id ?? null);
 
   const { base, sale, price } = effectivePrice(product);
   const rating = ratingSummary(product.reviews);
@@ -133,7 +138,7 @@ export default async function ProductPage({
   };
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
+    <div className="mx-auto max-w-content px-5 pb-24 pt-36 sm:px-8 lg:px-12">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -147,6 +152,17 @@ export default async function ProductPage({
         <Link href="/shop" className="transition-colors hover:text-foreground">
           Shop
         </Link>
+        {product.category?.parent && (
+          <>
+            <span className="mx-1.5">/</span>
+            <Link
+              href={`/category/${product.category.parent.slug}`}
+              className="transition-colors hover:text-foreground"
+            >
+              {product.category.parent.name}
+            </Link>
+          </>
+        )}
         {product.category && (
           <>
             <span className="mx-1.5">/</span>
@@ -189,14 +205,14 @@ export default async function ProductPage({
 
       <section className="mt-16 grid gap-10 lg:grid-cols-2 lg:gap-14">
         <div>
-          <h2 className="font-display text-2xl font-bold">Description</h2>
+          <h2 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">Description</h2>
           <p className="mt-4 leading-relaxed text-muted-foreground">
             {product.description}
           </p>
         </div>
 
         <div>
-          <h2 className="font-display text-2xl font-bold">Details</h2>
+          <h2 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">Details</h2>
           <dl className="mt-4 text-sm">
             {[
               ["Brand", product.brand?.name ?? "—"],
@@ -217,19 +233,19 @@ export default async function ProductPage({
         </div>
       </section>
 
-      <section className="mt-16">
-        <h2 className="font-display text-2xl font-bold">
+      <section id="reviews" className="mt-16 scroll-mt-32">
+        <h2 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">
           Reviews{rating.count > 0 && ` (${rating.count})`}
         </h2>
 
         {product.reviews.length === 0 ? (
           <p className="mt-4 rounded-card border border-dashed border-border p-8 text-center text-muted-foreground">
-            No reviews yet. Buy this product and you can be the first to review it.
+            No reviews yet — customers can review this product once their order arrives.
           </p>
         ) : (
           <div className="mt-6 grid gap-10 lg:grid-cols-[18rem_1fr]">
             <div className="rounded-card border border-border p-6">
-              <p className="font-display text-5xl font-bold">
+              <p className="font-display text-5xl font-medium">
                 {rating.average.toFixed(1)}
               </p>
               <div className="mt-2">
@@ -284,11 +300,36 @@ export default async function ProductPage({
             </ul>
           </div>
         )}
+
+        <div className="mt-10 max-w-2xl">
+          {reviewState === "eligible" ? (
+            <ReviewForm productId={product.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {reviewState === "signed-out" ? (
+                <>
+                  Bought this?{" "}
+                  <Link
+                    href={`/login?next=${encodeURIComponent(`/products/${product.slug}#reviews`)}`}
+                    className="font-medium text-foreground underline underline-offset-4 hover:text-gold-ink"
+                  >
+                    Sign in
+                  </Link>{" "}
+                  to share your review.
+                </>
+              ) : reviewState === "reviewed" ? (
+                "Thanks — you've already reviewed this product."
+              ) : (
+                "Reviews open to customers once their order has been delivered."
+              )}
+            </p>
+          )}
+        </div>
       </section>
 
       {related.length > 0 && (
         <section className="mt-16">
-          <h2 className="font-display text-2xl font-bold">You may also like</h2>
+          <h2 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">You may also like</h2>
           <div className="mt-6 grid grid-cols-2 gap-5 lg:grid-cols-4">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} saved={saved.has(p.id)} />

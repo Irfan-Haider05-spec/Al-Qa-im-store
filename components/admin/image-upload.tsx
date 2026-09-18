@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import Image from "next/image";
 import { Upload, X } from "lucide-react";
 
 export function ImageUpload({
@@ -45,7 +44,10 @@ export function ImageUpload({
       {value ? (
         <div className="relative inline-block">
           <div className="relative h-32 w-32 overflow-hidden rounded-control border border-border">
-            <Image src={value} alt="Uploaded" fill className="object-cover" />
+            {/* A plain <img>: next/image throws for hosts not allow-listed in
+                next.config, and a pasted URL is not checked until it is saved. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={value} alt="Uploaded" className="h-full w-full object-cover" />
           </div>
           <button
             type="button"
@@ -71,7 +73,7 @@ export function ImageUpload({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/avif"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];

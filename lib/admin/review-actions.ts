@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/session";
 import { logActivity } from "@/lib/admin/activity";
@@ -19,6 +20,7 @@ export async function approveReview(id: string) {
   });
   revalidatePath("/admin/reviews");
   revalidatePath(`/products`); // review counts/ratings surface on PDPs
+  revalidateStorefront(); // featured reviews on the homepage
   return { ok: true, productId: review.productId };
 }
 

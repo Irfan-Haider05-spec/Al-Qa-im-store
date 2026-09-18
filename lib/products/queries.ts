@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
+import { cachedStorefront } from "@/lib/cache/storefront";
+import { compareSizes } from "@/lib/catalog/shop-filters";
 import type { Prisma, Gender } from "@prisma/client";
 
 export type SortKey =
@@ -10,7 +12,7 @@ export type SortKey =
 
 export type ProductFilters = {
   q?: string;
-  category?: string; // category slug
+  category?: string; // category or department slug
   brand?: string; // brand slug
   gender?: string; // men | women | unisex | kids
   size?: string; // size label, e.g. "10"
@@ -49,6 +51,14 @@ export type ProductCardData = Prisma.ProductGetPayload<{
   include: typeof productCardInclude;
 }>;
 
+/**
+ * Products in a category — or, for a department such as "Clothing", in any of
+ * the categories inside it.
+ */
+function inCategory(slug: string): Prisma.ProductWhereInput {
+  return { category: { OR: [{ slug }, { parent: { slug } }] } };
+}
+
 function buildWhere(filters: ProductFilters): Prisma.ProductWhereInput {
   const {
     q,
@@ -65,7 +75,7 @@ function buildWhere(filters: ProductFilters): Prisma.ProductWhereInput {
 
   return {
     isPublished: true,
-    ...(category ? { category: { slug: category } } : {}),
+    ...(category ? inCategory(category) : {}),
     ...(brand ? { brand: { slug: brand } } : {}),
     ...(gender ? { gender: gender.toUpperCase() as Gender } : {}),
     ...(size ? { sizes: { some: { label: size } } } : {}),
@@ -154,7 +164,7 @@ export async function getProductBySlug(slug: string) {
   return prisma.product.findFirst({
     where: { slug, isPublished: true },
     include: {
-      category: true,
+      category: { include: { parent: { select: { slug: true, name: true } } } },
       brand: true,
       images: { orderBy: { position: "asc" } },
       colors: true,
@@ -183,37 +193,111 @@ export async function getRelatedProducts(
   });
 }
 
-export async function getCategories() {
-  return prisma.category.findMany({
+/* ------------------------------------------------------- category tree -- */
+
+export type CategoryNode = {
+  id: string;
+  slug: string;
+  name: string;
+  imageUrl: string | null;
+  description: string | null;
+  /** Published products here, including those in child categories. */
+  productCount: number;
+  children: CategoryNode[];
+};
+
+/**
+ * Departments and their categories, as shoppers should see them: active only,
+ * in the admin's order, and without anything that has no published products
+ * yet — a new "Shirts" category appears the moment its first shirt goes live,
+ * rather than as an empty page before then.
+ */
+async function readCategoryTree(): Promise<CategoryNode[]> {
+  const rows = await prisma.category.findMany({
     where: { isActive: true },
-    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      imageUrl: true,
+      description: true,
+      parentId: true,
+      _count: { select: { products: { where: { isPublished: true } } } },
+    },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
   });
+
+  const leaf = (row: (typeof rows)[number]): CategoryNode => ({
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    imageUrl: row.imageUrl,
+    description: row.description,
+    productCount: row._count.products,
+    children: [],
+  });
+
+  return rows
+    .filter((row) => !row.parentId)
+    .map((top) => {
+      // Children of an inactive department never reach here: their parent
+      // isn't in `rows`, so they are hidden along with it.
+      const children = rows
+        .filter((row) => row.parentId === top.id)
+        .map(leaf)
+        .filter((child) => child.productCount > 0);
+      const node = leaf(top);
+      node.children = children;
+      node.productCount += children.reduce((sum, c) => sum + c.productCount, 0);
+      // A department without its own photo borrows its first category's.
+      node.imageUrl ??= children.find((c) => c.imageUrl)?.imageUrl ?? null;
+      return node;
+    })
+    .filter((node) => node.productCount > 0);
+}
+
+export const getCategoryTree = cachedStorefront(readCategoryTree, "category-tree");
+
+/**
+ * The categories products actually sit in: a department's children, or the
+ * department itself when it has none. Used for the homepage grid and pills.
+ */
+export function leafCategories(tree: CategoryNode[]): CategoryNode[] {
+  return tree.flatMap((node) => (node.children.length ? node.children : [node]));
 }
 
 /* ----------------------------------------------------- facets for the shop -- */
 
-/** Every value the shop's filter sidebar can offer, straight from the catalogue. */
-export async function getFilterFacets() {
+/**
+ * Every value the shop's filter sidebar can offer, from the products in view.
+ * Scoped to the chosen category so Clothing offers S–XL and Footwear offers
+ * shoe sizes, instead of one long mixed list.
+ */
+export async function getFilterFacets(scope: { category?: string } = {}) {
+  const inScope: Prisma.ProductWhereInput = {
+    isPublished: true,
+    ...(scope.category ? inCategory(scope.category) : {}),
+  };
+
   const [brands, sizes, colors, priceRange] = await Promise.all([
     prisma.brand.findMany({
-      where: { products: { some: { isPublished: true } } },
+      where: { isActive: true, products: { some: inScope } },
       select: { slug: true, name: true },
-      orderBy: { name: "asc" },
+      orderBy: [{ position: "asc" }, { name: "asc" }],
     }),
     prisma.productSize.findMany({
-      where: { product: { isPublished: true } },
+      where: { product: inScope },
       select: { label: true },
       distinct: ["label"],
-      orderBy: { position: "asc" },
     }),
     prisma.productColor.findMany({
-      where: { product: { isPublished: true } },
+      where: { product: inScope },
       select: { name: true, hex: true },
       distinct: ["name"],
       orderBy: { name: "asc" },
     }),
     prisma.product.aggregate({
-      where: { isPublished: true },
+      where: inScope,
       _min: { basePrice: true },
       _max: { basePrice: true },
     }),
@@ -221,15 +305,7 @@ export async function getFilterFacets() {
 
   return {
     brands,
-    // Numeric labels first and in numeric order ("7" before "10"), then the rest.
-    sizes: sizes
-      .map((s) => s.label)
-      .sort((a, b) => {
-        const na = Number(a);
-        const nb = Number(b);
-        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-        return a.localeCompare(b);
-      }),
+    sizes: sizes.map((s) => s.label).sort(compareSizes),
     colors,
     minPrice: Math.floor(Number(priceRange._min.basePrice ?? 0)),
     maxPrice: Math.ceil(Number(priceRange._max.basePrice ?? 500)),
@@ -244,13 +320,13 @@ export async function getFilterFacets() {
  * "New arrival" flag, and this is what the page picks up.
  */
 export async function getHomepageContent() {
-  const [homepage, categories, newArrivals, featured, banner] = await Promise.all([
+  const [homepage, tree, newArrivals, featured, banner] = await Promise.all([
     prisma.homepage.findFirst({
       include: {
         slides: { where: { isActive: true }, orderBy: { position: "asc" } },
       },
     }),
-    getCategories(),
+    getCategoryTree(),
     prisma.product.findMany({
       where: { isPublished: true, isNewArrival: true },
       include: productCardInclude,
@@ -292,7 +368,9 @@ export async function getHomepageContent() {
 
   return {
     homepage,
-    categories,
+    // What the homepage grid and pills show: categories with products in them.
+    categories: leafCategories(tree),
+    departments: tree,
     newArrivals: newArrivals.length ? newArrivals : featured,
     featured,
     weeklyPick,
@@ -354,3 +432,100 @@ export async function searchSuggestions(q: string, take = 6) {
     image: p.images[0]?.url ?? null,
   }));
 }
+
+/* ------------------------------------------------------------- hero slides -- */
+
+/**
+ * Active hero slides with the product each one links to, so the hero caption
+ * can show a real name and price. `HeroSlide.productId` is a plain column (the
+ * slide can outlive its product), hence the second lookup rather than an
+ * include — and why a slide whose product was unpublished or deleted simply
+ * shows no caption instead of a broken link.
+ */
+async function readHeroSlides() {
+  const slides = await prisma.heroSlide.findMany({
+    where: { isActive: true },
+    orderBy: { position: "asc" },
+  });
+
+  const ids = slides.map((s) => s.productId).filter((id): id is string => Boolean(id));
+  const products = ids.length
+    ? await prisma.product.findMany({
+        where: { id: { in: ids }, isPublished: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          basePrice: true,
+          salePrice: true,
+          category: { select: { name: true } },
+        },
+      })
+    : [];
+  const byId = new Map(products.map((p) => [p.id, p]));
+
+  return slides.map((slide) => {
+    const product = slide.productId ? byId.get(slide.productId) : undefined;
+    return {
+      imageUrl: slide.imageUrl,
+      durationMs: slide.durationMs,
+      product: product
+        ? {
+            name: product.name,
+            slug: product.slug,
+            price: Number(product.salePrice ?? product.basePrice),
+            compareAt: product.salePrice != null ? Number(product.basePrice) : null,
+            category: product.category?.name ?? null,
+          }
+        : null,
+    };
+  });
+}
+
+/* ------------------------------------------------------------ social proof -- */
+
+/**
+ * Real, approved, well-rated reviews with something to say — for the homepage
+ * testimonials. Nothing here is invented: an empty store shows no section.
+ */
+async function readFeaturedReviews(take = 6) {
+  const reviews = await prisma.review.findMany({
+    where: {
+      isApproved: true,
+      rating: { gte: 4 },
+      comment: { not: null },
+      product: { isPublished: true },
+    },
+    include: {
+      user: { select: { name: true } },
+      product: { select: { name: true, slug: true } },
+    },
+    orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+    take: take * 3,
+  });
+
+  // One review per product, so the wall isn't five takes on the same shoe.
+  const seen = new Set<string>();
+  const unique = reviews.filter((r) => {
+    if (seen.has(r.productId)) return false;
+    seen.add(r.productId);
+    return true;
+  });
+
+  return unique.slice(0, take).map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    title: r.title,
+    comment: r.comment ?? "",
+    // First name and initial only — enough to feel real, not enough to expose.
+    author: r.user?.name
+      ? r.user.name.split(" ").map((part, i) => (i === 0 ? part : `${part[0]}.`)).join(" ")
+      : "Verified buyer",
+    product: r.product,
+  }));
+}
+
+/* Cached: JSON-safe, identical for every visitor, invalidated from the admin. */
+export const getHeroSlides = cachedStorefront(readHeroSlides, "hero-slides");
+export const getFeaturedReviews = cachedStorefront(readFeaturedReviews, "featured-reviews");
+

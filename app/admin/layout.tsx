@@ -16,7 +16,7 @@ export default async function AdminLayout({
     <ToastProvider>
       <AdminShell
         userLabel={user.name ?? user.email ?? "Admin"}
-        role={String(user.role)}
+        role={user.role}
         logoutForm={
           <form action={logout}>
             <button

@@ -40,39 +40,60 @@ export async function updateOrderStatus(input: {
   });
   if (!order) return { ok: false, error: "Order not found." };
 
+  if (order.status === status) return { ok: true };
+
   const wasRestocked = RESTOCK_STATUSES.includes(order.status);
   const willRestock = RESTOCK_STATUSES.includes(status);
 
-  await prisma.$transaction(async (tx) => {
-    // Return stock only on the transition INTO a cancelled/refunded state.
-    if (!wasRestocked && willRestock) {
-      for (const item of order.items) {
-        await tx.inventory.updateMany({
-          where: { variantId: item.variantId },
-          data: { available: { increment: item.quantity } },
-        });
-      }
-    }
-    // If moving back OUT of cancelled/refunded, take the stock again.
-    if (wasRestocked && !willRestock) {
-      for (const item of order.items) {
-        await tx.inventory.updateMany({
-          where: { variantId: item.variantId },
-          data: { available: { decrement: item.quantity } },
-        });
-      }
-    }
-
-    await tx.order.update({ where: { id: orderId }, data: { status } });
-
-    // Keep payment status roughly in sync for refunds.
-    if (status === "REFUNDED") {
-      await tx.payment.updateMany({
-        where: { orderId },
-        data: { status: "REFUNDED" },
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Claim the transition first, conditioned on the status we read. If two
+      // admins (or a double click) change the same order at once, only one
+      // claim matches, so stock can never be returned or taken twice.
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: order.status },
+        data: { status },
       });
-    }
-  });
+      if (claimed.count === 0) {
+        throw new Error("This order was just updated by someone else. Reload and try again.");
+      }
+
+      // Return stock only on the transition INTO a cancelled/refunded state.
+      if (!wasRestocked && willRestock) {
+        for (const item of order.items) {
+          await tx.inventory.updateMany({
+            where: { variantId: item.variantId },
+            data: { available: { increment: item.quantity } },
+          });
+        }
+      }
+      // Moving back OUT of cancelled/refunded takes the stock again, but only
+      // if it is still there; otherwise the order cannot be revived.
+      if (wasRestocked && !willRestock) {
+        for (const item of order.items) {
+          const taken = await tx.inventory.updateMany({
+            where: { variantId: item.variantId, available: { gte: item.quantity } },
+            data: { available: { decrement: item.quantity } },
+          });
+          if (taken.count === 0) {
+            throw new Error(
+              `Not enough stock left to reopen this order ("${item.productName}").`
+            );
+          }
+        }
+      }
+
+      // Keep payment status roughly in sync for refunds.
+      if (status === "REFUNDED") {
+        await tx.payment.updateMany({
+          where: { orderId },
+          data: { status: "REFUNDED" },
+        });
+      }
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not update the order." };
+  }
 
   await logActivity({
     userId: admin.id,
@@ -92,7 +113,7 @@ export async function setTracking(input: {
   trackingNumber: string;
 }) {
   const admin = await requirePermission("orders.write");
-  const trackingNumber = input.trackingNumber.trim();
+  const trackingNumber = String(input.trackingNumber ?? "").trim().slice(0, 80);
   await prisma.order.update({
     where: { id: input.orderId },
     data: { trackingNumber: trackingNumber || null },
@@ -114,7 +135,7 @@ export async function setInternalNotes(input: {
   await requirePermission("orders.write");
   await prisma.order.update({
     where: { id: input.orderId },
-    data: { internalNotes: input.notes.trim() || null },
+    data: { internalNotes: String(input.notes ?? "").trim().slice(0, 4000) || null },
   });
   revalidatePath(`/admin/orders/${input.orderId}`);
   return { ok: true };

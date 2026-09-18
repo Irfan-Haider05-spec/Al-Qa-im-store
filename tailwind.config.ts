@@ -40,6 +40,13 @@ const config: Config = {
           foreground: token("muted-foreground"),
         },
         border: token("border"),
+        gold: {
+          DEFAULT: token("gold"),
+          light: token("gold-light"),
+          ink: token("gold-ink"),
+        },
+        ivory: token("ivory"),
+        ink: token("secondary"),
         success: token("success"),
         warning: token("warning"),
         danger: token("danger"),
@@ -53,9 +60,10 @@ const config: Config = {
       boxShadow: {
         card: "var(--shadow-card)",
         hover: "var(--shadow-hover)",
+        gold: "var(--shadow-gold)",
       },
       fontFamily: {
-        display: ["var(--font-display)", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "serif"],
         sans: ["var(--font-body)", "system-ui", "sans-serif"],
       },
       maxWidth: {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import type { FilterKey } from "@/lib/catalog/shop-filters";
 
 const GENDERS = [
   { value: "men", label: "Men" },
@@ -11,6 +12,12 @@ const GENDERS = [
   { value: "unisex", label: "Unisex" },
   { value: "kids", label: "Kids" },
 ];
+
+export type FilterCategory = {
+  slug: string;
+  name: string;
+  children: { slug: string; name: string }[];
+};
 
 export type Facets = {
   brands: { slug: string; name: string }[];
@@ -25,18 +32,22 @@ export type Facets = {
  *
  * Every control writes to the query string and lets the server re-run the
  * query — filtering is never faked on the client, so a filtered URL is
- * shareable, crawlable and correct on a hard refresh. The facet values
- * themselves come from the catalogue, so a new colour or size shows up here
- * without a code change.
+ * shareable, crawlable and correct on a hard refresh. The facet values come
+ * from the products in view, and which groups appear (and in what order) is
+ * set in Admin → Shop filters.
  */
 export function ShopFilters({
   categories,
+  groups,
   facets,
   resultCount,
+  currency = "USD",
 }: {
-  categories: { slug: string; name: string }[];
+  categories: FilterCategory[];
+  groups: FilterKey[];
   facets: Facets;
   resultCount: number;
+  currency?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -60,6 +71,21 @@ export function ShopFilters({
 
   const toggleParam = (key: string, value: string) =>
     setParam(key, current(key) === value ? null : value);
+
+  // Sizes and colours belong to the category in view — a shoe size means
+  // nothing among shirts — so they reset when the category changes.
+  const setCategory = (slug: string | null) => {
+    const next = new URLSearchParams(params.toString());
+    for (const key of ["category", "size", "color", "page"]) next.delete(key);
+    if (slug) next.set("category", slug);
+    const query = next.toString();
+    startTransition(() => router.push(query ? `${pathname}?${query}` : pathname));
+  };
+
+  const symbol =
+    new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 })
+      .formatToParts(0)
+      .find((p) => p.type === "currency")?.value ?? "";
 
   // A filter chosen in the mobile drawer should show its result, so close it.
   useEffect(() => {
@@ -90,32 +116,51 @@ export function ShopFilters({
     "inStock",
   ].filter((k) => params.get(k)).length;
 
-  const panel = (
-    <div className="space-y-8">
+  const sections: Record<FilterKey, React.ReactNode> = {
+    category: categories.length > 0 && (
       <FilterGroup title="Category">
+        <ul className="space-y-1.5">
+          <li>
+            <OptionButton active={!current("category")} onClick={() => setCategory(null)}>
+              All categories
+            </OptionButton>
+          </li>
+          {categories.map((d) => (
+            <li key={d.slug}>
+              <OptionButton active={current("category") === d.slug} onClick={() => setCategory(d.slug)}>
+                {d.name}
+              </OptionButton>
+              {d.children.length > 0 && (
+                <ul className="mt-1.5 space-y-1.5 border-l border-border pl-3.5">
+                  {d.children.map((c) => (
+                    <li key={c.slug}>
+                      <OptionButton active={current("category") === c.slug} onClick={() => setCategory(c.slug)}>
+                        {c.name}
+                      </OptionButton>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </FilterGroup>
+    ),
+
+    brand: facets.brands.length > 1 && (
+      <FilterGroup title="Brand">
         <OptionList
           options={[
-            { value: "", label: "All categories" },
-            ...categories.map((c) => ({ value: c.slug, label: c.name })),
+            { value: "", label: "All brands" },
+            ...facets.brands.map((b) => ({ value: b.slug, label: b.name })),
           ]}
-          value={current("category")}
-          onSelect={(v) => setParam("category", v || null)}
+          value={current("brand")}
+          onSelect={(v) => setParam("brand", v || null)}
         />
       </FilterGroup>
+    ),
 
-      {facets.brands.length > 1 && (
-        <FilterGroup title="Brand">
-          <OptionList
-            options={[
-              { value: "", label: "All brands" },
-              ...facets.brands.map((b) => ({ value: b.slug, label: b.name })),
-            ]}
-            value={current("brand")}
-            onSelect={(v) => setParam("brand", v || null)}
-          />
-        </FilterGroup>
-      )}
-
+    gender: (
       <FilterGroup title="Gender">
         <OptionList
           options={[{ value: "", label: "Everyone" }, ...GENDERS]}
@@ -123,58 +168,60 @@ export function ShopFilters({
           onSelect={(v) => setParam("gender", v || null)}
         />
       </FilterGroup>
+    ),
 
-      {facets.sizes.length > 0 && (
-        <FilterGroup title="Size">
-          <div className="flex flex-wrap gap-2">
-            {facets.sizes.map((size) => (
-              <button
-                key={size}
-                type="button"
-                onClick={() => toggleParam("size", size)}
-                aria-pressed={current("size") === size}
-                className={cn(
-                  "h-9 min-w-[2.5rem] rounded-control border px-2.5 text-sm transition-colors",
-                  current("size") === size
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:border-primary"
-                )}
-              >
-                {size}
-              </button>
-            ))}
-          </div>
-        </FilterGroup>
-      )}
+    size: facets.sizes.length > 0 && (
+      <FilterGroup title="Size">
+        <div className="flex flex-wrap gap-2">
+          {facets.sizes.map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => toggleParam("size", size)}
+              aria-pressed={current("size") === size}
+              className={cn(
+                "h-9 min-w-[2.5rem] rounded-control border px-2.5 text-sm transition-colors",
+                current("size") === size
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:border-primary"
+              )}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+      </FilterGroup>
+    ),
 
-      {facets.colors.length > 0 && (
-        <FilterGroup title="Colour">
-          <div className="flex flex-wrap gap-2">
-            {facets.colors.map((color) => (
-              <button
-                key={color.name}
-                type="button"
-                onClick={() => toggleParam("color", color.name)}
-                title={color.name}
-                aria-label={color.name}
-                aria-pressed={current("color") === color.name}
-                className={cn(
-                  "grid h-8 w-8 place-items-center rounded-full border-2 transition-colors",
-                  current("color") === color.name
-                    ? "border-primary"
-                    : "border-border hover:border-primary/50"
-                )}
-              >
-                <span
-                  className="h-5 w-5 rounded-full border border-black/5"
-                  style={{ backgroundColor: color.hex }}
-                />
-              </button>
-            ))}
-          </div>
-        </FilterGroup>
-      )}
+    color: facets.colors.length > 0 && (
+      <FilterGroup title="Colour">
+        <div className="flex flex-wrap gap-2">
+          {facets.colors.map((color) => (
+            <button
+              key={color.name}
+              type="button"
+              onClick={() => toggleParam("color", color.name)}
+              title={color.name}
+              aria-label={color.name}
+              aria-pressed={current("color") === color.name}
+              className={cn(
+                "grid h-8 w-8 place-items-center rounded-full border-2 transition-colors",
+                current("color") === color.name
+                  ? "border-primary"
+                  : "border-border hover:border-primary/50"
+              )}
+            >
+              <span
+                className="h-5 w-5 rounded-full border border-black/5"
+                style={{ backgroundColor: color.hex }}
+              />
+            </button>
+          ))}
+        </div>
+      </FilterGroup>
+    ),
 
+    price: (
       <FilterGroup title="Price">
         <div className="flex items-center gap-2">
           <label className="sr-only" htmlFor="minPrice">
@@ -186,7 +233,7 @@ export function ShopFilters({
             inputMode="numeric"
             min={facets.minPrice}
             max={facets.maxPrice}
-            placeholder={`$${facets.minPrice}`}
+            placeholder={`${symbol}${facets.minPrice}`}
             defaultValue={current("minPrice")}
             onBlur={(e) => setParam("minPrice", e.target.value || null)}
             className="w-full rounded-control border border-border px-3 py-2 text-sm"
@@ -203,14 +250,16 @@ export function ShopFilters({
             inputMode="numeric"
             min={facets.minPrice}
             max={facets.maxPrice}
-            placeholder={`$${facets.maxPrice}`}
+            placeholder={`${symbol}${facets.maxPrice}`}
             defaultValue={current("maxPrice")}
             onBlur={(e) => setParam("maxPrice", e.target.value || null)}
             className="w-full rounded-control border border-border px-3 py-2 text-sm"
           />
         </div>
       </FilterGroup>
+    ),
 
+    rating: (
       <FilterGroup title="Rating">
         <OptionList
           options={[
@@ -222,7 +271,9 @@ export function ShopFilters({
           onSelect={(v) => setParam("minRating", v || null)}
         />
       </FilterGroup>
+    ),
 
+    availability: (
       <FilterGroup title="Availability">
         <div className="space-y-2.5">
           <label className="flex cursor-pointer items-center gap-2.5 text-sm">
@@ -245,6 +296,12 @@ export function ShopFilters({
           </label>
         </div>
       </FilterGroup>
+    ),
+  };
+
+  const panel = (
+    <div className="space-y-7">
+      {groups.map((key) => (sections[key] ? <div key={key}>{sections[key]}</div> : null))}
 
       {activeCount > 0 && (
         <button
@@ -280,9 +337,9 @@ export function ShopFilters({
 
       {/* Desktop rail */}
       <aside aria-label="Product filters" className="hidden lg:block">
-        <div className="sticky top-24">
-          <div className="mb-6 flex items-center gap-2">
-            <h2 className="font-display text-lg font-bold uppercase">Filters</h2>
+        <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pb-6 pr-2">
+          <div className="mb-5 flex items-center gap-2">
+            <h2 className="eyebrow text-foreground">Filters</h2>
             {pending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Updating results" />
             )}
@@ -307,7 +364,7 @@ export function ShopFilters({
             className="absolute inset-y-0 left-0 flex w-[22rem] max-w-[88%] flex-col bg-background shadow-hover"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="font-display text-lg font-bold uppercase">Filters</h2>
+              <h2 className="eyebrow text-foreground">Filters</h2>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
@@ -345,11 +402,35 @@ function FilterGroup({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 font-display text-base font-semibold uppercase tracking-wide">
+      <legend className="mb-3.5 font-display text-lg font-medium">
         {title}
       </legend>
       {children}
     </fieldset>
+  );
+}
+
+function OptionButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "text-left text-sm transition-colors",
+        active ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -375,7 +456,7 @@ function OptionList({
               className={cn(
                 "text-sm transition-colors",
                 active
-                  ? "font-semibold text-primary"
+                  ? "font-semibold text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >

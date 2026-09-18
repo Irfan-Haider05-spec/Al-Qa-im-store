@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import {
   getProducts,
-  getCategories,
+  getCategoryTree,
   getFilterFacets,
   type SortKey,
 } from "@/lib/products/queries";
+import { enabledFilterKeys } from "@/lib/catalog/shop-filters";
 import { getSiteSettings } from "@/lib/settings/site";
 import { getWishlistProductIds } from "@/lib/account/wishlist-actions";
 import { ProductCard } from "@/components/product/product-card";
 import { ShopFilters } from "@/components/product/shop-filters";
 import { SortSelect } from "@/components/product/sort-select";
+import { CategoryChips } from "@/components/product/category-chips";
 import { Pagination } from "@/components/ui/pagination";
 
 export async function generateMetadata({
@@ -27,7 +30,7 @@ export async function generateMetadata({
   return {
     title: q ? `Search: ${q}` : (seo?.title ?? "Shop"),
     description:
-      seo?.description ?? "Browse the full Shoe Express collection.",
+      seo?.description ?? "Browse the full Al-Qa’im collection.",
     // A filtered or searched listing is the same catalogue sliced differently,
     // so it points back at the clean /shop URL instead of competing with it.
     alternates: { canonical: "/shop" },
@@ -82,14 +85,28 @@ export default async function ShopPage({
     perPage: 12,
   };
 
-  const [{ products, total, page, totalPages }, categories, facets, settings, saved] =
+  const [{ products, total, page, totalPages }, tree, facets, settings, saved] =
     await Promise.all([
       getProducts(filters),
-      getCategories(),
-      getFilterFacets(),
+      getCategoryTree(),
+      getFilterFacets({ category: filters.category }),
       getSiteSettings(),
       getWishlistProductIds(),
     ]);
+
+  // Where we are in the tree, for the heading and breadcrumb.
+  const department = filters.category
+    ? tree.find(
+        (d) => d.slug === filters.category || d.children.some((c) => c.slug === filters.category)
+      )
+    : undefined;
+  const category =
+    department?.slug === filters.category
+      ? department
+      : department?.children.find((c) => c.slug === filters.category);
+
+  const heading = filters.q ? `Results for “${filters.q}”` : (category?.name ?? "Shop");
+  const filterGroups = enabledFilterKeys(settings.shopFilters);
 
   const makeHref = (target: number) => {
     const next = new URLSearchParams();
@@ -105,32 +122,71 @@ export default async function ShopPage({
   const to = Math.min(page * filters.perPage, total);
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
-      <header className="mb-8">
-        <h1 className="font-display text-4xl font-bold uppercase sm:text-5xl">
-          {filters.q ? `Results for “${filters.q}”` : "Shop"}
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {total === 0
-            ? "No products found"
-            : `${total} ${total === 1 ? "product" : "products"}`}
-        </p>
+    <div className="mx-auto max-w-content px-5 pb-20 pt-[7.5rem] sm:px-8 lg:px-12">
+      {/* Compact header: where you are, what's here and how it's sorted, on
+          one line — the products start within the first screen. */}
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-border pb-5">
+        <div className="min-w-0">
+          <nav aria-label="Breadcrumb" className="mb-1.5 text-xs text-muted-foreground">
+            <Link href="/" className="hover:text-foreground">
+              Home
+            </Link>
+            <span className="mx-1.5">/</span>
+            <Link href="/shop" className="hover:text-foreground">
+              Shop
+            </Link>
+            {department && (
+              <>
+                <span className="mx-1.5">/</span>
+                <Link href={`/shop?category=${department.slug}`} className="hover:text-foreground">
+                  {department.name}
+                </Link>
+              </>
+            )}
+            {category && category !== department && (
+              <>
+                <span className="mx-1.5">/</span>
+                <span className="text-foreground">{category.name}</span>
+              </>
+            )}
+          </nav>
+          <h1 className="font-display text-[clamp(1.9rem,3.4vw,2.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">
+            {heading}
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-5">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {total === 0
+              ? "No products"
+              : total <= filters.perPage
+                ? `${total} ${total === 1 ? "product" : "products"}`
+                : `${from}–${to} of ${total} products`}
+          </p>
+          <SortSelect />
+        </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[240px_1fr] lg:gap-12">
+      {!filters.q && tree.length > 1 && (
+        <div className="mt-5">
+          <CategoryChips tree={tree} current={filters.category} sort={filters.sort} />
+        </div>
+      )}
+
+      <div className="mt-7 grid gap-6 lg:grid-cols-[228px_1fr] lg:gap-10">
         <ShopFilters
-          categories={categories}
+          categories={tree.map((d) => ({
+            slug: d.slug,
+            name: d.name,
+            children: d.children.map((c) => ({ slug: c.slug, name: c.name })),
+          }))}
+          groups={filterGroups}
           facets={facets}
           resultCount={total}
+          currency={settings.currency}
         />
 
         <div>
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {total === 0 ? "Nothing to show" : `Showing ${from}–${to} of ${total}`}
-            </p>
-            <SortSelect />
-          </div>
 
           {products.length === 0 ? (
             <div className="rounded-card border border-dashed border-border p-16 text-center">

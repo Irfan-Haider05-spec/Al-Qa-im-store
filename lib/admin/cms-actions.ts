@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/session";
 import { logActivity } from "@/lib/admin/activity";
 import { z } from "zod";
+import {
+  imageUrlSchema,
+  linkUrlSchema,
+  optionalImageUrlSchema,
+  optionalLinkUrlSchema,
+} from "@/lib/validations/urls";
 
 // ---------------- Homepage ----------------
 const homepageSchema = z.object({
@@ -12,13 +19,13 @@ const homepageSchema = z.object({
   heroSubheading: z.string().min(1),
   heroDescription: z.string().min(1),
   heroCtaLabel: z.string().min(1),
-  heroCtaUrl: z.string().min(1),
+  heroCtaUrl: linkUrlSchema,
   weeklyPickHeading: z.string().optional().or(z.literal("")),
   weeklyPickDesc: z.string().optional().or(z.literal("")),
   weeklyPickProductId: z.string().optional().or(z.literal("")),
   membershipHeading: z.string().optional().or(z.literal("")),
   membershipCtaLabel: z.string().optional().or(z.literal("")),
-  membershipCtaUrl: z.string().optional().or(z.literal("")),
+  membershipCtaUrl: optionalLinkUrlSchema,
 });
 
 export async function saveHomepage(input: unknown) {
@@ -54,7 +61,7 @@ export async function saveHomepage(input: unknown) {
     action: "homepage.updated",
     entity: "Homepage",
   });
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/homepage");
   return { ok: true };
 }
@@ -63,9 +70,9 @@ export async function saveHomepage(input: unknown) {
 const bannerSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().optional().or(z.literal("")),
-  imageUrl: z.string().min(1, "Image is required"),
-  ctaLabel: z.string().optional().or(z.literal("")),
-  ctaUrl: z.string().optional().or(z.literal("")),
+  imageUrl: imageUrlSchema,
+  ctaLabel: z.string().max(40).optional().or(z.literal("")),
+  ctaUrl: optionalLinkUrlSchema,
   startAt: z.string().optional().or(z.literal("")),
   endAt: z.string().optional().or(z.literal("")),
   isActive: z.boolean().default(true),
@@ -92,7 +99,7 @@ export async function createBanner(input: unknown) {
   });
   await logActivity({ userId: admin.id, action: "banner.created", entity: "Banner" });
   revalidatePath("/admin/banners");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true };
 }
 
@@ -100,7 +107,7 @@ export async function toggleBanner(id: string, active: boolean) {
   await requirePermission("homepage.write");
   await prisma.banner.update({ where: { id }, data: { isActive: active } });
   revalidatePath("/admin/banners");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true };
 }
 
@@ -108,11 +115,20 @@ export async function deleteBanner(id: string) {
   await requirePermission("homepage.write");
   await prisma.banner.delete({ where: { id } });
   revalidatePath("/admin/banners");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true };
 }
 
 // ---------------- SEO ----------------
+// OG images are fetched by social networks, not rendered by next/image, so any
+// https URL (or a path on this site) is acceptable.
+const seoSchema = z.object({
+  pageKey: z.string().trim().min(1, "Page key required").max(40).regex(/^[a-z0-9-]+$/),
+  title: z.string().trim().max(120),
+  description: z.string().trim().max(320),
+  ogImageUrl: optionalLinkUrlSchema,
+});
+
 export async function saveSeo(input: {
   pageKey: string;
   title: string;
@@ -120,8 +136,11 @@ export async function saveSeo(input: {
   ogImageUrl: string;
 }) {
   const admin = await requirePermission("settings.write");
-  const { pageKey, title, description, ogImageUrl } = input;
-  if (!pageKey) return { ok: false, error: "Page key required" };
+  const parsed = seoSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
+  }
+  const { pageKey, title, description, ogImageUrl } = parsed.data;
 
   await prisma.sEOSettings.upsert({
     where: { pageKey },
@@ -149,18 +168,19 @@ export async function saveSeo(input: {
 
 // ---------------- Site settings ----------------
 const settingsSchema = z.object({
-  storeName: z.string().min(1),
-  logoUrl: z.string().optional().or(z.literal("")),
-  contactEmail: z.string().optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  address: z.string().optional().or(z.literal("")),
-  currency: z.string().min(1),
+  storeName: z.string().trim().min(1).max(60),
+  logoUrl: optionalImageUrlSchema,
+  contactEmail: z.string().trim().email("Enter a valid contact email").max(254).optional().or(z.literal("")),
+  phone: z.string().trim().max(32).optional().or(z.literal("")),
+  address: z.string().trim().max(300).optional().or(z.literal("")),
+  // ISO 4217 — Intl.NumberFormat throws on anything else, on every page.
+  currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Use a 3-letter currency code, e.g. USD or PKR"),
   flatShipping: z.coerce.number().nonnegative().optional().nullable(),
   freeShippingThreshold: z.coerce.number().nonnegative().optional().nullable(),
   taxRate: z.coerce.number().min(0).max(1).optional().nullable(),
-  instagram: z.string().optional().or(z.literal("")),
-  facebook: z.string().optional().or(z.literal("")),
-  youtube: z.string().optional().or(z.literal("")),
+  instagram: optionalLinkUrlSchema,
+  facebook: optionalLinkUrlSchema,
+  youtube: optionalLinkUrlSchema,
 });
 
 export async function saveSettings(input: unknown) {
@@ -198,7 +218,7 @@ export async function saveSettings(input: unknown) {
     action: "settings.updated",
     entity: "SiteSettings",
   });
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/settings");
   return { ok: true };
 }
@@ -212,9 +232,9 @@ export async function saveSettings(input: unknown) {
  * the homepage.
  */
 const heroSlideSchema = z.object({
-  imageUrl: z.string().min(1, "An image is required"),
+  imageUrl: imageUrlSchema,
   productId: z.string().optional().or(z.literal("")),
-  durationMs: z.coerce.number().int().min(1500).max(20000),
+  durationMs: z.coerce.number().int().min(600).max(20000),
   isActive: z.boolean().default(true),
 });
 
@@ -262,7 +282,7 @@ export async function createHeroSlide(input: unknown) {
   });
 
   await logActivity({ userId: admin.id, action: "hero.slide.created", entity: "HeroSlide" });
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/homepage");
   return { ok: true };
 }
@@ -286,7 +306,7 @@ export async function updateHeroSlide(id: string, input: unknown) {
   });
 
   await logActivity({ userId: admin.id, action: "hero.slide.updated", entity: "HeroSlide", meta: { id } });
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/homepage");
   return { ok: true };
 }
@@ -296,7 +316,7 @@ export async function deleteHeroSlide(id: string) {
   await prisma.heroSlide.delete({ where: { id } });
 
   await logActivity({ userId: admin.id, action: "hero.slide.deleted", entity: "HeroSlide", meta: { id } });
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/homepage");
   return { ok: true };
 }
@@ -327,7 +347,7 @@ export async function moveHeroSlide(id: string, direction: "up" | "down") {
     prisma.heroSlide.update({ where: { id: neighbour.id }, data: { position: slide.position } }),
   ]);
 
-  revalidatePath("/");
+  revalidateStorefront();
   revalidatePath("/admin/homepage");
   return { ok: true };
 }

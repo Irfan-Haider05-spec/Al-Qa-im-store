@@ -24,7 +24,8 @@ export function Rating({
             width={size}
             height={size}
             className={
-              i < rounded ? "fill-accent text-accent" : "text-border"
+              // Deeper gold than the brand fill, so the stars hold up on ivory.
+              i < rounded ? "fill-gold-ink text-gold-ink" : "fill-border text-border"
             }
           />
         ))}

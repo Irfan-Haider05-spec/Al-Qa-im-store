@@ -7,6 +7,15 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 
 const GUEST_COOKIE = "se_cart";
+const MAX_LINE_QUANTITY = 20;
+
+/** Server actions are public endpoints: arguments arrive as whatever was sent. */
+function validQuantity(q: unknown): q is number {
+  return typeof q === "number" && Number.isInteger(q) && q >= 0 && q <= MAX_LINE_QUANTITY;
+}
+function validId(id: unknown): id is string {
+  return typeof id === "string" && id.length > 0 && id.length <= 64;
+}
 
 // Resolve (or create) the caller's cart — DB-backed for users, cookie token for guests.
 async function resolveCart(createIfMissing = true) {
@@ -40,14 +49,18 @@ async function resolveCart(createIfMissing = true) {
 }
 
 export async function addToCart(variantId: string, quantity = 1) {
-  if (quantity < 1) return { ok: false, error: "Invalid quantity" };
+  if (!validId(variantId) || !validQuantity(quantity) || quantity < 1) {
+    return { ok: false, error: "Invalid quantity" };
+  }
 
   // Verify variant + stock server-side — never trust the client.
   const variant = await prisma.productVariant.findUnique({
     where: { id: variantId },
-    include: { inventory: true },
+    include: { inventory: true, product: { select: { isPublished: true } } },
   });
-  if (!variant) return { ok: false, error: "Variant not found" };
+  if (!variant || !variant.product.isPublished) {
+    return { ok: false, error: "This item is no longer available." };
+  }
 
   const available = variant.inventory?.available ?? 0;
   const cart = await resolveCart(true);
@@ -57,6 +70,9 @@ export async function addToCart(variantId: string, quantity = 1) {
     where: { cartId_variantId: { cartId: cart.id, variantId } },
   });
   const desired = (existing?.quantity ?? 0) + quantity;
+  if (desired > MAX_LINE_QUANTITY) {
+    return { ok: false, error: `You can order up to ${MAX_LINE_QUANTITY} of one item.` };
+  }
   if (desired > available) {
     return { ok: false, error: `Only ${available} in stock` };
   }
@@ -72,6 +88,9 @@ export async function addToCart(variantId: string, quantity = 1) {
 }
 
 export async function updateCartItem(variantId: string, quantity: number) {
+  if (!validId(variantId) || !validQuantity(quantity)) {
+    return { ok: false, error: "Invalid quantity" };
+  }
   const cart = await resolveCart(false);
   if (!cart) return { ok: false, error: "No cart" };
 
@@ -92,8 +111,9 @@ export async function updateCartItem(variantId: string, quantity: number) {
     return { ok: false, error: `Only ${available} in stock` };
   }
 
-  await prisma.cartItem.update({
-    where: { cartId_variantId: { cartId: cart.id, variantId } },
+  // updateMany, so a line removed in another tab is a no-op, not a crash.
+  await prisma.cartItem.updateMany({
+    where: { cartId: cart.id, variantId },
     data: { quantity },
   });
   revalidatePath("/cart");
@@ -101,6 +121,7 @@ export async function updateCartItem(variantId: string, quantity: number) {
 }
 
 export async function removeCartItem(variantId: string) {
+  if (!validId(variantId)) return { ok: false, error: "Invalid item" };
   const cart = await resolveCart(false);
   if (!cart) return { ok: false, error: "No cart" };
   await prisma.cartItem

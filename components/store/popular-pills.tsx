@@ -38,10 +38,10 @@ export function PopularPills({ pills }: { pills: Pill[] }) {
             scroll={false}
             aria-current={active ? "true" : undefined}
             className={cn(
-              "rounded-pill border px-5 py-2 text-sm font-medium transition-colors",
+              "rounded-pill border px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
               active
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-foreground hover:border-primary hover:text-primary"
+                ? "border-ink bg-ink text-ivory"
+                : "border-border text-foreground hover:border-gold-ink hover:text-gold-ink"
             )}
           >
             {pill.label}

@@ -2,7 +2,7 @@ import { ProductCardSkeleton } from "@/components/ui/skeleton";
 
 export default function ShopLoading() {
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8">
+    <div className="mx-auto max-w-content px-5 pb-20 pt-36 sm:px-8 lg:px-12">
       <div className="mb-8 h-10 w-40 animate-pulse rounded-control bg-muted" />
       <div className="grid gap-10 lg:grid-cols-[220px_1fr]">
         <div className="hidden space-y-4 lg:block">

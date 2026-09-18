@@ -10,7 +10,7 @@
  */
 import { PrismaClient, Gender, Role, OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { BANNERS, BRANDS, CATEGORIES, HERO_SLIDES, PRODUCTS } from "./catalog";
+import { BANNERS, BRANDS, CATEGORIES, DEPARTMENTS, HERO_SLIDES, PRODUCTS } from "./catalog";
 
 const prisma = new PrismaClient();
 
@@ -49,8 +49,15 @@ const REVIEWERS = [
 ];
 
 async function seedUsers() {
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@shoeexpress.test";
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@alqaim.test";
   const adminPass = process.env.SEED_ADMIN_PASSWORD ?? "changeme123";
+
+  // A live store must never be seeded with the well-known default password.
+  if (process.env.NODE_ENV === "production" && (!process.env.SEED_ADMIN_PASSWORD || adminPass.length < 12)) {
+    throw new Error(
+      "Set SEED_ADMIN_PASSWORD (12+ characters) before seeding a production database."
+    );
+  }
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
@@ -62,19 +69,23 @@ async function seedUsers() {
       role: Role.SUPER_ADMIN,
     },
   });
-  console.log(`  admin     ${adminEmail} / ${adminPass}`);
+  // The password is only echoed when it is the documented local default;
+  // a real one should not end up in terminal scrollback or CI logs.
+  console.log(
+    `  admin     ${adminEmail} / ${process.env.SEED_ADMIN_PASSWORD ? "(SEED_ADMIN_PASSWORD)" : adminPass}`
+  );
 
   const customer = await prisma.user.upsert({
-    where: { email: "customer@shoeexpress.test" },
+    where: { email: "customer@alqaim.test" },
     update: {},
     create: {
-      email: "customer@shoeexpress.test",
+      email: "customer@alqaim.test",
       passwordHash: await bcrypt.hash("customer123", 12),
       name: "Demo Customer",
       role: Role.CUSTOMER,
     },
   });
-  console.log("  customer  customer@shoeexpress.test / customer123");
+  console.log("  customer  customer@alqaim.test / customer123");
 
   // A handful of review authors, so ratings aren't all from one account.
   const reviewers = [];
@@ -118,19 +129,17 @@ async function seedSettings() {
   if (!existing) {
     await prisma.siteSettings.create({
       data: {
-        storeName: "Shoe Express",
+        storeName: "Al-Qa’im",
         currency: "USD",
-        contactEmail: "hello@shoeexpress.test",
+        contactEmail: "hello@alqaim.test",
         phone: "+1 415 555 0100",
         address: "410 Mission Street, San Francisco, CA 94105",
         flatShipping: 9.0,
         freeShippingThreshold: 100.0,
         taxRate: 0.0,
-        socials: {
-          instagram: "https://instagram.com",
-          facebook: "https://facebook.com",
-          youtube: "https://youtube.com",
-        },
+        // Left empty on purpose: the footer only shows networks that have a
+        // real profile URL, added in Admin → Settings.
+        socials: { instagram: "", facebook: "", youtube: "" },
       },
     });
     console.log("  settings  created");
@@ -139,7 +148,7 @@ async function seedSettings() {
   const seoDefaults = [
     {
       pageKey: "home",
-      title: "Shoe Express — Premium footwear for every step",
+      title: "Al-Qa’im — Premium footwear, crafted to be worn",
       description:
         "Sneakers, performance runners, leather Oxfords and waterproof boots, chosen for how they wear rather than how they look on a shelf. Free delivery over $100.",
       ogImageUrl: "/banners/promo-primary.webp",
@@ -148,7 +157,7 @@ async function seedSettings() {
       pageKey: "shop",
       title: "Shop all footwear",
       description:
-        "Browse the full Shoe Express range — filter by category, size, colour, price and availability.",
+        "Browse the full Al-Qa’im range — filter by category, size, colour, price and availability.",
       ogImageUrl: "/banners/promo-primary.webp",
     },
   ];
@@ -162,7 +171,25 @@ async function seedSettings() {
 }
 
 async function seedCatalogue() {
-  for (const c of CATEGORIES) {
+  const departmentIds = new Map<string, string>();
+  for (const [position, d] of DEPARTMENTS.entries()) {
+    const dept = await prisma.category.upsert({
+      where: { slug: d.slug },
+      update: {},
+      create: {
+        name: d.name,
+        slug: d.slug,
+        description: d.description,
+        seoTitle: d.seoTitle,
+        seoDesc: d.seoDesc,
+        position,
+      },
+    });
+    departmentIds.set(d.slug, dept.id);
+  }
+
+  for (const [position, c] of CATEGORIES.entries()) {
+    const parentId = c.department ? (departmentIds.get(c.department) ?? null) : null;
     await prisma.category.upsert({
       where: { slug: c.slug },
       update: {},
@@ -173,10 +200,20 @@ async function seedCatalogue() {
         seoTitle: c.seoTitle,
         seoDesc: c.seoDesc,
         imageUrl: c.hasImage ? `/categories/${c.slug}.webp` : null,
+        parentId,
+        position,
       },
     });
+    // Databases seeded before departments existed: file the category under
+    // its department, but never move one an admin has already placed.
+    if (parentId) {
+      await prisma.category.updateMany({
+        where: { slug: c.slug, parentId: null },
+        data: { parentId },
+      });
+    }
   }
-  console.log(`  category  ${CATEGORIES.length} categories`);
+  console.log(`  category  ${DEPARTMENTS.length} departments, ${CATEGORIES.length} categories`);
 
   for (const b of BRANDS) {
     await prisma.brand.upsert({ where: { slug: b.slug }, update: {}, create: b });
@@ -216,9 +253,9 @@ async function seedCatalogue() {
         colors: { create: p.colors },
         sizes: { create: p.sizes.map((label, position) => ({ label, position })) },
         images: {
-          create: [0, 1, 2].map((i) => ({
+          create: Array.from({ length: p.photos ?? 3 }, (_, i) => ({
             url: `/products/${p.slug}-${i + 1}.webp`,
-            alt: `${p.name} — ${["side profile", "detail", "pair"][i]}`,
+            alt: `${p.name} — ${["main view", "detail", "alternate view"][i] ?? `view ${i + 1}`}`,
             position: i,
             isPrimary: i === 0,
           })),
@@ -391,16 +428,16 @@ async function seedCms() {
   if (!homepage) {
     homepage = await prisma.homepage.create({
       data: {
-        heroHeading: "SPORTS SHOES",
+        heroHeading: "Sports Shoes",
         heroSubheading: "Men's collection",
         heroDescription:
-          "Find your true stride with Shoe Express — performance builds, everyday classics and a fit that holds from the first mile to the last.",
-        heroCtaLabel: "Shop Now",
+          "Performance silhouettes and hand-finished classics — chosen for how they feel on the hundredth mile, not just the first.",
+        heroCtaLabel: "Shop the collection",
         heroCtaUrl: "/shop",
-        weeklyPickHeading: "OUR WEEKLY PICK",
+        weeklyPickHeading: "Our weekly pick",
         weeklyPickDesc: "Chosen by our team every Monday. This week, the one people keep coming back for.",
         weeklyPickProductId: weeklyPick?.id ?? null,
-        membershipHeading: "Become a member and get 20% off",
+        membershipHeading: "Join the members’ circle",
         membershipCtaLabel: "Sign up for free now",
         membershipCtaUrl: "/register",
       },
@@ -422,7 +459,7 @@ async function seedCms() {
           productId: product?.id ?? null,
           imageUrl: slide.imageUrl,
           position,
-          durationMs: 4200,
+          durationMs: 3200,
           isActive: true,
         },
       });
@@ -451,7 +488,7 @@ async function seedCoupons() {
 }
 
 async function main() {
-  console.log("Seeding Shoe Express…");
+  console.log("Seeding Al-Qa’im…");
   const { customer, reviewers } = await seedUsers();
   await seedSettings();
   await seedCatalogue();

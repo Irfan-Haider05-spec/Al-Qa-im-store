@@ -29,7 +29,7 @@ export default async function WishlistPage() {
           href="/shop"
           className="mt-4 inline-flex h-10 items-center rounded-pill bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary-deep"
         >
-          Discover shoes
+          Discover the collection
         </Link>
       </div>
     );

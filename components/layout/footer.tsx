@@ -1,46 +1,40 @@
 import Link from "next/link";
-import { Instagram, Facebook, Youtube, Mail, Phone } from "lucide-react";
-import { prisma } from "@/lib/db/prisma";
+import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from "lucide-react";
 import { getSiteSettings } from "@/lib/settings/site";
+import { getCategoryTree } from "@/lib/products/queries";
+import { Logo } from "@/components/brand/logo";
 
-const PRODUCTS = [
+const SHOP = [
   { label: "Shop all", href: "/shop" },
-  { label: "New in", href: "/shop?sort=newest" },
-  { label: "Weekly pick", href: "/#popular" },
+  { label: "New arrivals", href: "/shop?sort=newest" },
+  { label: "Best rated", href: "/shop?sort=rating" },
   { label: "On sale", href: "/shop?onSale=1" },
 ];
 
 const COMPANY = [
   { label: "About us", href: "/about" },
   { label: "Contact us", href: "/contact" },
+  { label: "Track your order", href: "/account/orders" },
   { label: "Payment options", href: "/about#payments" },
-  { label: "Track order", href: "/account/orders" },
-  { label: "Size charts", href: "/about#sizes" },
-  { label: "Support", href: "/contact" },
+  { label: "Size guide", href: "/about#sizes" },
 ];
 
 const LEGAL = [
-  { label: "Privacy Policy", href: "/legal/privacy" },
-  { label: "Terms & Conditions", href: "/legal/terms" },
-  { label: "Cookie settings", href: "/legal/cookies" },
+  { label: "Privacy", href: "/legal/privacy" },
+  { label: "Terms", href: "/legal/terms" },
+  { label: "Cookies", href: "/legal/cookies" },
   { label: "Imprint", href: "/legal/imprint" },
 ];
 
 export async function Footer() {
-  const [settings, categories] = await Promise.all([
+  const [settings, tree] = await Promise.all([
     getSiteSettings(),
-    prisma.category
-      .findMany({
-        where: { isActive: true },
-        select: { slug: true, name: true },
-        orderBy: { name: "asc" },
-        take: 8,
-      })
-      .catch(() => []),
+    getCategoryTree().catch(() => []),
   ]);
+  // Departments first, then their categories, up to eight links.
+  const categories = tree.flatMap((d) => [d, ...d.children]).slice(0, 8);
 
-  // Only render a social icon when a real URL is configured — an icon linking
-  // to "#" is the sort of dead control this build is meant to be free of.
+  // Only real links become icons — an icon pointing at "#" is a dead control.
   const socials = [
     { Icon: Instagram, label: "Instagram", href: settings.socials.instagram },
     { Icon: Facebook, label: "Facebook", href: settings.socials.facebook },
@@ -50,64 +44,23 @@ export async function Footer() {
   );
 
   return (
-    <footer className="bg-accent text-accent-foreground">
-      <div className="mx-auto max-w-content px-5 py-14 sm:px-8 sm:py-16">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4">
-          <div>
-            <h2 className="font-display text-lg font-semibold uppercase">Products</h2>
-            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
-              {PRODUCTS.map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} className="transition-colors hover:text-white">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+    <footer className="surface-dark relative isolate overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/50 to-transparent"
+      />
 
+      <div className="mx-auto max-w-content px-5 pb-10 pt-20 sm:px-8 lg:px-12">
+        <div className="grid gap-12 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:gap-10">
           <div>
-            <h2 className="font-display text-lg font-semibold uppercase">Category</h2>
-            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
-              {categories.length > 0 ? (
-                categories.map((c) => (
-                  <li key={c.slug}>
-                    <Link
-                      href={`/category/${c.slug}`}
-                      className="transition-colors hover:text-white"
-                    >
-                      {c.name}
-                    </Link>
-                  </li>
-                ))
-              ) : (
-                <li>
-                  <Link href="/shop" className="transition-colors hover:text-white">
-                    Shop all
-                  </Link>
-                </li>
-              )}
-            </ul>
-          </div>
+            <Logo logoUrl={settings.logoUrl} name={settings.storeName} size="lg" />
+            <p className="mt-6 max-w-xs text-sm leading-relaxed text-ivory/55">
+              Premium footwear and clothing, chosen for how it wears and how
+              long it lasts — delivered to your door, paid for when it arrives.
+            </p>
 
-          <div>
-            <h2 className="font-display text-lg font-semibold uppercase">Company info</h2>
-            <ul className="mt-4 space-y-2.5 text-sm text-accent-foreground/85">
-              {COMPANY.map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} className="transition-colors hover:text-white">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h2 className="font-display text-lg font-semibold uppercase">Follow us</h2>
-
-            {socials.length > 0 ? (
-              <div className="mt-4 flex gap-3">
+            {socials.length > 0 && (
+              <div className="mt-7 flex gap-2">
                 {socials.map(({ Icon, label, href }) => (
                   <a
                     key={label}
@@ -115,49 +68,60 @@ export async function Footer() {
                     target="_blank"
                     rel="noreferrer noopener"
                     aria-label={label}
-                    className="grid h-10 w-10 place-items-center rounded-full bg-white/20 transition-colors hover:bg-white/30"
+                    className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-ivory/75 transition-colors hover:border-gold/60 hover:text-gold-light"
                   >
-                    <Icon className="h-5 w-5" aria-hidden />
+                    <Icon className="h-4 w-4" aria-hidden />
                   </a>
                 ))}
               </div>
-            ) : (
-              <p className="mt-4 text-sm text-accent-foreground/70">
-                Social links can be added in Admin → Settings.
-              </p>
             )}
+          </div>
 
-            <address className="mt-6 space-y-2 text-sm not-italic text-accent-foreground/85">
-              {settings.contactEmail && (
-                <a
-                  href={`mailto:${settings.contactEmail}`}
-                  className="flex items-center gap-2 transition-colors hover:text-white"
-                >
-                  <Mail className="h-4 w-4" aria-hidden />
-                  {settings.contactEmail}
-                </a>
-              )}
-              {settings.phone && (
-                <a
-                  href={`tel:${settings.phone.replace(/\s/g, "")}`}
-                  className="flex items-center gap-2 transition-colors hover:text-white"
-                >
-                  <Phone className="h-4 w-4" aria-hidden />
-                  {settings.phone}
-                </a>
-              )}
-            </address>
+          <FooterColumn title="Shop" links={SHOP} />
+          <FooterColumn
+            title="Collections"
+            links={
+              categories.length
+                ? categories.map((c) => ({ label: c.name, href: `/category/${c.slug}` }))
+                : [{ label: "Shop all", href: "/shop" }]
+            }
+          />
+
+          <div>
+            <FooterColumn title="Company" links={COMPANY} />
+            {(settings.contactEmail || settings.phone || settings.address) && (
+              <address className="mt-8 space-y-3 text-sm not-italic text-ivory/60">
+                {settings.contactEmail && (
+                  <a href={`mailto:${settings.contactEmail}`} className="flex items-start gap-2.5 transition-colors hover:text-gold-light">
+                    <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+                    {settings.contactEmail}
+                  </a>
+                )}
+                {settings.phone && (
+                  <a href={`tel:${settings.phone.replace(/\s/g, "")}`} className="flex items-start gap-2.5 transition-colors hover:text-gold-light">
+                    <Phone className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+                    {settings.phone}
+                  </a>
+                )}
+                {settings.address && (
+                  <p className="flex items-start gap-2.5">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
+                    {settings.address}
+                  </p>
+                )}
+              </address>
+            )}
           </div>
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/25 pt-6">
-          <p className="text-sm text-accent-foreground/75">
+        <div className="mt-16 flex flex-col gap-5 border-t border-white/10 pt-8 text-xs text-ivory/45 sm:flex-row sm:items-center sm:justify-between">
+          <p>
             © {new Date().getFullYear()} {settings.storeName}. All rights reserved.
           </p>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-accent-foreground/75">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {LEGAL.map((l) => (
               <li key={l.label}>
-                <Link href={l.href} className="transition-colors hover:text-white">
+                <Link href={l.href} className="uppercase tracking-[0.12em] transition-colors hover:text-gold-light">
                   {l.label}
                 </Link>
               </li>
@@ -166,5 +130,28 @@ export async function Footer() {
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterColumn({
+  title,
+  links,
+}: {
+  title: string;
+  links: { label: string; href: string }[];
+}) {
+  return (
+    <div>
+      <h2 className="eyebrow text-gold-light">{title}</h2>
+      <ul className="mt-6 space-y-3 text-sm text-ivory/65">
+        {links.map((l) => (
+          <li key={`${l.label}-${l.href}`}>
+            <Link href={l.href} className="transition-colors hover:text-ivory">
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

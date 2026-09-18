@@ -1,11 +1,16 @@
-# Shoe Express
+# Al-Qa’im
 
-A production-ready e-commerce platform for a premium footwear brand: a
-photographic storefront, a variant-aware catalogue, real orders and inventory,
-and an admin CMS that genuinely drives what customers see.
+A production-ready e-commerce platform for Al-Qa’im, a premium footwear and
+clothing store:
+an ink-and-gold storefront with a real-time 3D hero, a variant-aware catalogue,
+real orders and inventory, and an admin CMS that genuinely drives what
+customers see.
 
 Built with Next.js 15 (App Router), React 19, TypeScript in strict mode,
-PostgreSQL via Prisma, Auth.js v5, Tailwind and Framer Motion.
+PostgreSQL via Prisma, Auth.js v5, Tailwind, three.js and Framer Motion.
+
+> **Launching?** Read [DEPLOYMENT.md](DEPLOYMENT.md) — it includes the
+> launch checklist (remove demo data, set your logo, add your products).
 
 ---
 
@@ -35,13 +40,22 @@ PostgreSQL via Prisma, Auth.js v5, Tailwind and Framer Motion.
 
 **Storefront**
 
-- Animated hero carousel of cut-out product photography, CMS-managed
+- 3D hero (three.js): cut-out product photography floating inside metallic
+  gold rings, with a gold-dust field, pointer parallax and a scroll dolly —
+  slides, order and timing managed in Admin → Homepage
 - "Popular right now" category pills that re-query the database via the URL
 - Editorial new-arrivals rail, category grid, campaign banner, weekly pick
+- Departments (Footwear, Clothing) holding categories (Sneakers… / Shirts,
+  Trousers), with a department mega-menu, department tiles on the homepage and
+  department/category chips on the shop page
 - Shop with search, and filters for category, brand, gender, size, colour,
-  price, rating, availability and sale — all server-side, all shareable URLs
+  price, rating, availability and sale — all server-side, all shareable URLs.
+  Sizes and colours follow the section in view (S–XXL in Shirts, waist sizes
+  in Trousers, shoe sizes in Footwear); which filter groups show, and in what
+  order, is set in Admin → Shop filters
 - Product pages with a zoomable gallery, colour/size variants, live stock,
-  reviews with a rating distribution, and related products
+  reviews with a rating distribution, verified-buyer review submission
+  (moderated), and related products
 - Cart (database-backed for customers, cookie-token for guests), coupons,
   checkout, order history, wishlist, addresses and account management
 
@@ -49,8 +63,13 @@ PostgreSQL via Prisma, Auth.js v5, Tailwind and Framer Motion.
 
 - Dashboard with real revenue, orders, customers, top products and low stock
 - Products with variants, images, inventory, flags and per-product SEO
-- Categories, brands, inventory adjustments, orders, customers, reviews,
-  coupons, banners, users, site settings and an activity log
+- Products with a **sizes, colours & stock** editor (size sets for shoes,
+  clothing and waists; one-size items supported) and a "ready to sell"
+  checklist
+- Departments and categories (with photo, description and SEO), brands
+  (logo, visibility in the filter, order), shop filter settings, inventory adjustments,
+  orders, customers, a contact-form inbox, reviews, coupons, banners, users,
+  site settings (including the logo) and an activity log
 - Homepage CMS: hero copy, hero slides (image, linked product, timing, order,
   active state), weekly pick and membership block
 
@@ -81,10 +100,10 @@ Open <http://localhost:3000>. The seed prints the admin credentials it created.
 | `DATABASE_URL` | yes | Runtime connection. On Supabase, the **transaction pooler** URL (port 6543, `?pgbouncer=true`) — pooled, so it survives serverless. |
 | `DIRECT_URL` | yes | Migrations only. The **direct** connection (port 5432); `prisma migrate` and `db push` need to bypass the pooler. |
 | `AUTH_SECRET` | yes | Signs session JWTs. Generate with `npx auth secret` or `openssl rand -base64 32`. |
-| `NEXTAUTH_URL` | yes | The site's own origin, e.g. `https://shoeexpress.com`. |
+| `NEXTAUTH_URL` | yes | The site's own origin, e.g. `https://alqaim.store`. Auth.js builds its redirects from it, so it must match the URL you serve from. |
 | `NEXT_PUBLIC_SITE_URL` | yes | Public origin, used for canonical URLs, Open Graph, sitemap and JSON-LD. **Set this in production** or those URLs point at localhost. |
-| `SEED_ADMIN_EMAIL` | no | Email for the admin the seed creates. Default `admin@shoeexpress.test`. |
-| `SEED_ADMIN_PASSWORD` | no | Its password. Default `changeme123` — **change it before any public deployment.** |
+| `SEED_ADMIN_EMAIL` | no | Email for the admin the seed creates. Default `admin@alqaim.test`. |
+| `SEED_ADMIN_PASSWORD` | no | Its password. Default `changeme123` locally; the seed **refuses** to run with `NODE_ENV=production` unless you set a 12+ character one. |
 | `NEXT_PUBLIC_SUPABASE_URL` | for uploads | Supabase project URL, for admin image uploads. |
 | `SUPABASE_SERVICE_ROLE_KEY` | for uploads | Service-role secret. Server-only; never referenced from client code. |
 | `SUPABASE_STORAGE_BUCKET` | for uploads | Public bucket name, default `product-images`. |
@@ -170,16 +189,21 @@ app/
   admin/              admin dashboard and CMS
   api/                search suggestions, image upload, health, auth
 components/
-  animations/         hero carousel, scroll reveals
+  brand/              logo mark and wordmark
   layout/             header, footer, search dialog
-  product/            cards, gallery, buy panel, filters, wishlist
-  store/              homepage sections
+  product/            cards, gallery, buy panel, filters, wishlist, review form
+  store/hero/         hero copy + controls, and the three.js stage
+  store/              other homepage sections
   checkout/  cart/  account/  admin/  ui/
 lib/
   auth/               Auth.js config (split edge/node), session, permissions
+  cache/              shared storefront cache + admin-side invalidation
   db/                 Prisma client singleton
   products/           catalogue queries, pricing
   orders/             order placement, totals, coupons
+  reviews/            verified-buyer review submission
+  security/           Postgres-backed rate limiting
+  brand.ts            store name and tagline
   cart/  account/  admin/  settings/  storage/  payments/  validations/
 prisma/
   schema.prisma       the data model
@@ -188,6 +212,7 @@ prisma/
 scripts/
   assets.manifest.json  every photograph's source
   prepare-images.mjs    download, optimise, background removal
+  prepare-launch.ts     removes the seed's demo customers, orders and reviews
 ```
 
 ---
@@ -205,12 +230,20 @@ Admin is not a separate world — it edits the same rows the storefront reads:
 | Products → New arrival | Appears in the New Arrival rail |
 | Products → Featured | Appears in Popular right now |
 | Products → Published off | Disappears from the storefront and the sitemap |
-| Categories | Nav, footer, category pages, filters, homepage pills |
+| Categories → department | Where a category sits (Clothing › Shirts): menus, filters, breadcrumbs, department pages |
+| Categories → photo / description | Header "Collections" menu, homepage department tiles, category banner |
+| Brands → shown / hidden, order | The shop's Brand filter |
+| Shop filters | Which filter groups the shop sidebar shows, and their order |
+| Product → sizes, colours & stock | The colour swatches and size buttons on the product page, and what can be bought |
+| Settings → logo | Header, footer, admin sidebar (replaces the built-in Al-Qa’im mark) |
+| Settings → store name | Page titles, header, footer, emails-to-be |
 | Banners | The campaign band (respects start/end dates) |
 | Settings → currency / shipping / tax | Every price, the cart, the checkout and new orders |
 | Settings → social links | Footer icons (hidden when unset, rather than linking nowhere) |
 
-Every mutation calls `revalidatePath`, so changes appear on the next request.
+Every mutation revalidates what it touched — including the shared storefront
+cache (`lib/cache/storefront.ts`) that holds settings, navigation categories,
+hero slides and featured reviews — so changes appear on the next request.
 
 ---
 
@@ -227,6 +260,12 @@ Enforcement is in two layers, and the second is the one that matters:
 2. Every server action calls `requirePermission(...)` before it touches data.
 
 Hiding a button is presentation, not security — the server never trusts the UI.
+(The admin sidebar does hide sections a role can't open, purely so nobody is
+shown a link that leads to a "forbidden" page.)
+
+Roles are read **from the database on every request**, not from the session
+token, so demoting or deleting an admin takes effect immediately rather than
+when their token expires.
 
 ---
 
@@ -250,7 +289,8 @@ To add a provider: implement `PaymentProvider`, register it in
 
 There is no email provider configured, and the app does not pretend otherwise —
 no code claims to have sent a message it didn't send. Contact form submissions
-are stored in the `ContactMessage` table and readable in Admin.
+are stored in the `ContactMessage` table and read, marked and answered (via
+your mail client) in **Admin → Messages**.
 
 To add email, write a service behind a small interface (mirroring
 `lib/payments/provider.ts`), configure `RESEND_API_KEY` or your provider's
@@ -265,9 +305,15 @@ Admin image uploads go to Supabase Storage. Create a **public** bucket named
 `product-images` (Storage → New bucket), then set `NEXT_PUBLIC_SUPABASE_URL`,
 `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET`.
 
-`POST /api/upload` requires an admin role, caps files at 5 MB and accepts only
-JPEG, PNG, WebP and AVIF. Without configuration it returns `501` and says so —
-it does not silently drop the file. Binaries are never stored in Postgres.
+`POST /api/upload` requires a role that can edit products, the homepage or
+settings, caps files at 5 MB and accepts only JPEG, PNG, WebP and AVIF —
+identified from the file's **bytes**, not the name or the browser's claimed
+type, and stored under a server-generated name. Without configuration it
+returns `501` and says so. Binaries are never stored in Postgres.
+
+Image URLs typed into the admin are validated too: a path on this site, or an
+https URL on Supabase Storage or Cloudinary. Anything else is refused at save
+time, because `next/image` would otherwise throw on the storefront.
 
 For S3 or Cloudinary instead, reimplement `lib/storage/supabase.ts` against the
 same two exports and add the hostname to `images.remotePatterns` in
@@ -303,17 +349,31 @@ scoped to `[data-js="on"]` — set by a tiny inline script before first paint. I
 that script never runs (a crawler, a blocked bundle), every section renders
 visible. Nothing can strand content at `opacity: 0`.
 
-`prefers-reduced-motion` removes movement while keeping content visible. The
-hero carousel pauses on hover, on focus, when the tab is hidden and when it
-scrolls out of view, and its decorative drift is a compositor-only CSS animation
-rather than a JavaScript loop that would keep the main thread busy forever.
+**The hero.** The three.js stage is loaded only on the homepage, after
+hydration; a server-rendered poster paints first and is the fallback where
+WebGL is unavailable. Rendering stops whenever the hero is off-screen, the tab
+is hidden or the visitor presses pause, and every GPU resource is disposed on
+unmount. The carousel has a visible pause control (WCAG 2.2.2).
+
+**Reduced motion.** With `prefers-reduced-motion` (which Windows turns on when
+"Show animations" is off) the hero switches to a *gentle* mode — shoes
+cross-fade in place, the rings keep turning slowly, and the fly-through,
+parallax and scroll dolly are removed — rather than freezing. There is
+deliberately no blanket `transition-duration: 0` rule: it flattened every
+hover and fade on the site for those visitors.
 
 ---
 
 ## 14. Security notes
 
-- Passwords hashed with bcrypt (cost 12); sign-in compares against a dummy hash
-  for unknown emails so response time doesn't reveal which accounts exist
+- Passwords hashed with bcrypt (cost 12); sign-in compares against a real
+  dummy hash for unknown emails so response time doesn't reveal which accounts
+  exist
+- **Rate limiting** (Postgres-backed, so it works across serverless instances)
+  on sign-in (per IP and per account, enforced inside Auth.js so the raw
+  callback endpoint is covered), registration, the contact form (plus a
+  honeypot), coupon checks, checkout and review submission
+- Post-login redirects accept same-site paths only (no open redirect)
 - All input validated with Zod, on the server, at the boundary
 - **Prices, discounts, shipping and tax are always recomputed server-side** from
   the database when an order is placed. The browser's numbers are a preview.
@@ -323,8 +383,14 @@ rather than a JavaScript loop that would keep the main thread busy forever.
 - Stock decrements are guarded (`available >= quantity`) inside the same
   transaction that writes the order, so two simultaneous buyers can't oversell
 - Parameterised queries throughout Prisma; no string-built SQL
-- Security headers (HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
-  `Referrer-Policy`, `Permissions-Policy`) in `next.config.ts`
+- Order status changes are claimed atomically, so a double click or two
+  admins can't restock a cancelled order twice; reopening a cancelled order
+  re-takes stock only if it is still there
+- Products unpublished after they were added to a basket can't be checked out
+- Security headers (a safe CSP subset — `frame-ancestors`, `base-uri`,
+  `form-action`, `object-src` — plus HSTS, `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`) in
+  `next.config.ts`
 - Admin actions written to `AdminActivityLog` with actor, action and entity
 
 ---
@@ -347,10 +413,16 @@ Suits any Next.js host; Vercel is the shortest path.
    ```bash
    DATABASE_URL=... DIRECT_URL=... npx prisma migrate deploy
    ```
-5. Seed once if you want the demo catalogue: `npm run db:seed`.
+5. Seed once: `npm run db:seed` (creates the admin, settings and CMS copy,
+   plus a demo catalogue).
 6. **Change the seeded admin password**, or delete the account and promote your
    own.
-7. Commit the generated `/public` images, or run `npm run assets:build` as part
+7. Remove demo data before opening: `npm run launch:prepare -- --apply`
+   (add `--catalog` to also unpublish the demo products).
+8. Deploy the functions in the same region as the database — `vercel.json`
+   pins Mumbai (`bom1`) to match a Supabase `ap-south-1` project. Every page
+   makes several database round trips; across continents that is seconds.
+9. Commit the generated `/public` images, or run `npm run assets:build` as part
    of the build.
 
 ---
@@ -389,5 +461,11 @@ Honest list of what is *not* done:
   for per-zone or per-product tax.
 - **Shipping is flat plus a free-delivery threshold.** Zones would slot into the
   same function.
-- **Product images are stock photography.** Replace them with real product shots
-  before selling anything.
+- **Product images are stock photography**, and the seeded reviews, customers
+  and orders are demo data. `npm run launch:prepare` removes the demo people,
+  orders and reviews; replace or unpublish the demo products before selling.
+- **No self-service password reset.** It needs an email provider; until one
+  is configured, the login page points customers to the contact form.
+- **The logo is a vector recreation** of the Al-Qa’im mark. Upload the original
+  artwork in Admin → Settings → Logo and it replaces the built-in mark
+  everywhere.

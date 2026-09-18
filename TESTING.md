@@ -1,13 +1,16 @@
-# Shoe Express — Testing Checklist
+# Al-Qa’im — Testing Checklist
 
 Run through this before considering a release done. Check each box.
 
 ## Customer — storefront
 
-- [ ] Homepage renders; hero animation cycles (and is static with reduced motion)
+- [ ] Homepage renders; the 3D hero rotates shoes inside the gold rings, and the pause button stops it
+- [ ] With reduced motion (Windows "Show animations" off) the hero cross-fades in place instead of flying
+- [ ] No double/ghosted shoe while the hero loads; the "Now showing" chip links to the product
 - [ ] Popular category pills re-query the catalogue via `?popular=` and keep the URL shareable
 - [ ] New Arrivals show real products with prices/ratings
-- [ ] Shop: category filter works and updates `?category=`
+- [ ] Shop: category filter works and updates `?category=`; a department includes its categories
+- [ ] Shop: sizes offered match the section (S–XXL in Shirts, 28–38 in Trousers)
 - [ ] Shop: gender / price / sale filters work
 - [ ] Shop: sort (featured/newest/price/rating) works
 - [ ] Shop: pagination works
@@ -30,7 +33,9 @@ Run through this before considering a release done. Check each box.
 - [ ] Wishlist add/remove works
 - [ ] Address add/delete works; first address is default
 - [ ] Profile: name update + password change (with current-password check)
-- [ ] Contact form submits (message stored)
+- [ ] Contact form submits and appears in Admin → Messages
+- [ ] Login with `?next=/account/wishlist` returns there after signing in
+- [ ] A customer with a DELIVERED order can review that product; the review waits for approval
 
 ## Admin
 
@@ -39,17 +44,28 @@ Run through this before considering a release done. Check each box.
 - [ ] Product create / edit / publish / delete
 - [ ] Editing a price shows on the storefront
 - [ ] Marking New Arrival / Weekly Pick affects the homepage
-- [ ] Category create / activate / delete (blocked if it has products)
+- [ ] Category create / activate / delete (blocked if it has products or sub-categories)
+- [ ] New category inside a department (e.g. Clothing › Shirts) appears in the menu, homepage tiles and filter only once it has a published product
+- [ ] Brands: add, hide from filter, reorder, delete (products keep selling without a brand)
+- [ ] Shop filters: switching a group off removes it from the shop sidebar; order is respected
+- [ ] New product → Create & continue → add photo, colours, sizes and stock → checklist all green → publish → buyable
+- [ ] One-size product (no sizes) can be added to cart without choosing a size
+- [ ] Removing a size that has been ordered is refused with an explanation
+- [ ] Deleting a product that has been ordered unpublishes it instead
+- [ ] Category edit: photo, description and SEO save; toggling Active keeps the SEO fields
+- [ ] Messages: mark read/unread, reply opens the mail client, delete
 - [ ] Inventory: set stock; low/out badges update
-- [ ] Orders: change status; Cancelled/Refunded returns stock
+- [ ] Orders: change status; Cancelled/Refunded returns stock exactly once (double-click safe)
+- [ ] Reopening a cancelled order is refused if the stock has since sold
 - [ ] Orders: set tracking + internal notes
 - [ ] Reviews: approve → appears on the PDP; reject/delete
 - [ ] Coupons: create/toggle/delete
 - [ ] Homepage CMS: edit hero → storefront updates
 - [ ] Banners: create (with image), schedule, toggle, delete
 - [ ] SEO: per-page save
-- [ ] Settings: save store config
-- [ ] Users: change role; can't demote last super admin
+- [ ] Settings: save store config; uploading a logo replaces the mark in header, footer and admin
+- [ ] Users: change role; can't demote last super admin; a demoted admin loses access immediately
+- [ ] An EDITOR only sees Products / Categories / Inventory / Homepage / Banners in the sidebar
 - [ ] Activity log records the above actions
 - [ ] Image upload to Supabase works (once bucket + keys are set)
 
@@ -60,7 +76,11 @@ Run through this before considering a release done. Check each box.
 - [ ] Open another user's order by ID at `/account/orders/[id]` → 404
 - [ ] Tamper with cart quantity beyond stock → server rejects at checkout
 - [ ] Apply an expired/invalid coupon → rejected server-side
-- [ ] Upload a non-image or >5MB file → rejected
+- [ ] Upload a non-image or >5MB file → rejected (also an HTML file renamed to .jpg)
+- [ ] Paste an image URL from an unapproved host in the admin → refused with a clear message
+- [ ] 9 wrong passwords for one account in 15 minutes → further attempts refused
+- [ ] Rapid contact-form / coupon / registration submissions → "Too many attempts"
+- [ ] `/login?next=//evil.example` → lands on /account, not off-site
 - [ ] Order totals always recomputed server-side (client values ignored)
 
 ## SEO / performance

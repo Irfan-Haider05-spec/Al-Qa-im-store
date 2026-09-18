@@ -18,9 +18,9 @@ export default async function AccountLayout({
   const user = await requireUser();
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8">
+    <div className="mx-auto max-w-content px-5 pb-20 pt-36 sm:px-8 lg:px-12">
       <header className="mb-8">
-        <h1 className="font-display text-4xl font-bold">My Account</h1>
+        <h1 className="font-display text-[clamp(2.4rem,5vw,3.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">My Account</h1>
         <p className="mt-1 text-muted-foreground">
           {user.name ?? user.email}
         </p>

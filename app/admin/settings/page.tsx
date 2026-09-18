@@ -12,7 +12,7 @@ export default async function AdminSettingsPage() {
       <PageHeader title="Settings" description="Store configuration" />
       <SettingsForm
         initial={{
-          storeName: s?.storeName ?? "Shoe Express",
+          storeName: s?.storeName ?? "Al-Qa’im",
           logoUrl: s?.logoUrl ?? "",
           contactEmail: s?.contactEmail ?? "",
           phone: s?.phone ?? "",
