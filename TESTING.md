@@ -9,7 +9,8 @@ Run through this before considering a release done. Check each box.
 - [ ] No double/ghosted shoe while the hero loads; the "Now showing" chip links to the product
 - [ ] Popular category pills re-query the catalogue via `?popular=` and keep the URL shareable
 - [ ] New Arrivals show real products with prices/ratings
-- [ ] Shop: category filter works and updates `?category=`
+- [ ] Shop: category filter works and updates `?category=`; a department includes its categories
+- [ ] Shop: sizes offered match the section (S–XXL in Shirts, 28–38 in Trousers)
 - [ ] Shop: gender / price / sale filters work
 - [ ] Shop: sort (featured/newest/price/rating) works
 - [ ] Shop: pagination works
@@ -43,7 +44,14 @@ Run through this before considering a release done. Check each box.
 - [ ] Product create / edit / publish / delete
 - [ ] Editing a price shows on the storefront
 - [ ] Marking New Arrival / Weekly Pick affects the homepage
-- [ ] Category create / activate / delete (blocked if it has products)
+- [ ] Category create / activate / delete (blocked if it has products or sub-categories)
+- [ ] New category inside a department (e.g. Clothing › Shirts) appears in the menu, homepage tiles and filter only once it has a published product
+- [ ] Brands: add, hide from filter, reorder, delete (products keep selling without a brand)
+- [ ] Shop filters: switching a group off removes it from the shop sidebar; order is respected
+- [ ] New product → Create & continue → add photo, colours, sizes and stock → checklist all green → publish → buyable
+- [ ] One-size product (no sizes) can be added to cart without choosing a size
+- [ ] Removing a size that has been ordered is refused with an explanation
+- [ ] Deleting a product that has been ordered unpublishes it instead
 - [ ] Category edit: photo, description and SEO save; toggling Active keeps the SEO fields
 - [ ] Messages: mark read/unread, reply opens the mail client, delete
 - [ ] Inventory: set stock; low/out badges update

@@ -145,7 +145,7 @@ export function SearchDialog({ currency = "USD" }: { currency?: string }) {
                   type="search"
                   value={term}
                   onChange={(e) => setTerm(e.target.value)}
-                  placeholder="Search shoes, brands or categories…"
+                  placeholder="Search products, brands or categories…"
                   aria-label="Search term"
                   className="h-16 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
                 />

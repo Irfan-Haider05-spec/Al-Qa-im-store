@@ -17,7 +17,31 @@ export type SeedCategory = {
   seoDesc: string;
   /** `/public/categories/<slug>.webp`, or null for a purely virtual category. */
   hasImage?: boolean;
+  /** Slug of the department this category sits in. */
+  department?: string;
 };
+
+/**
+ * Top-level departments. Categories sit inside them, and a department's page
+ * and filter cover everything in its categories. Clothing starts empty: its
+ * categories appear in the shop as soon as the first product is published.
+ */
+export const DEPARTMENTS: SeedCategory[] = [
+  {
+    name: "Footwear",
+    slug: "footwear",
+    description: "Sneakers, performance shoes, leather dress shoes and boots.",
+    seoTitle: "Footwear — Sneakers, Dress Shoes & Boots",
+    seoDesc: "Shop premium footwear at Al-Qa’im: sneakers, running shoes, leather Oxfords and boots.",
+  },
+  {
+    name: "Clothing",
+    slug: "clothing",
+    description: "Shirts, trousers and everyday essentials, cut to be worn and kept.",
+    seoTitle: "Clothing — Shirts & Trousers",
+    seoDesc: "Shop premium shirts and trousers at Al-Qa’im. Cash on delivery.",
+  },
+];
 
 export type SeedProduct = {
   name: string;
@@ -35,6 +59,8 @@ export type SeedProduct = {
   sizes: string[];
   /** Per-variant stock, so "low stock" and "sold out" states are real. */
   stock?: { low?: string[]; out?: string[] };
+  /** How many photos `/public/products/<slug>-N.webp` holds. Defaults to 3. */
+  photos?: number;
   flags?: Partial<{
     isFeatured: boolean;
     isNewArrival: boolean;
@@ -53,6 +79,7 @@ export const CATEGORIES: SeedCategory[] = [
     seoDesc:
       "Shop premium sneakers at Al-Qa’im — cushioned everyday silhouettes in leather, knit and suede.",
     hasImage: true,
+    department: "footwear",
   },
   {
     name: "Sports Shoes",
@@ -63,6 +90,7 @@ export const CATEGORIES: SeedCategory[] = [
     seoDesc:
       "Running and training shoes built for speed, rebound and lockdown fit. Free delivery over $100.",
     hasImage: true,
+    department: "footwear",
   },
   {
     name: "Basketball",
@@ -73,6 +101,7 @@ export const CATEGORIES: SeedCategory[] = [
     seoDesc:
       "Basketball high-tops and mids with responsive cushioning and herringbone court traction.",
     hasImage: true,
+    department: "footwear",
   },
   {
     name: "Oxford",
@@ -83,6 +112,7 @@ export const CATEGORIES: SeedCategory[] = [
     seoDesc:
       "Hand-finished leather Oxfords, derbies and brogues with cushioned insoles and welted soles.",
     hasImage: true,
+    department: "footwear",
   },
   {
     name: "Boots",
@@ -93,6 +123,25 @@ export const CATEGORIES: SeedCategory[] = [
     seoDesc:
       "Waterproof hiking and lifestyle boots with grippy lug outsoles and full-grain leather uppers.",
     hasImage: true,
+    department: "footwear",
+  },
+  {
+    name: "Shirts",
+    slug: "shirts",
+    description: "Oxford, poplin and linen shirts — pressed for the office, easy at the weekend.",
+    seoTitle: "Men's Shirts",
+    seoDesc: "Premium cotton and linen shirts at Al-Qa’im. Sizes XS–XXL, cash on delivery.",
+    hasImage: true,
+    department: "clothing",
+  },
+  {
+    name: "Trousers",
+    slug: "trousers",
+    description: "Denim, chinos and tailored trousers with a clean, modern cut.",
+    seoTitle: "Men's Trousers & Chinos",
+    seoDesc: "Chinos and tailored trousers at Al-Qa’im in waist sizes 28–40. Cash on delivery.",
+    hasImage: true,
+    department: "clothing",
   },
 ];
 
@@ -106,6 +155,8 @@ const SNEAKER_SIZES = ["7", "8", "9", "10", "11", "12"];
 const WOMENS_SIZES = ["5", "6", "7", "8", "9", "10"];
 const FORMAL_SIZES = ["8", "9", "10", "11", "12"];
 const EU_SIZES = ["41", "42", "43", "44"];
+const SHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
+const WAIST_SIZES = ["28", "30", "32", "34", "36", "38"];
 
 export const PRODUCTS: SeedProduct[] = [
   /* ------------------------------------------------------------- sneakers -- */
@@ -473,6 +524,84 @@ export const PRODUCTS: SeedProduct[] = [
     colors: [{ name: "Granite", hex: "#6a6f73" }],
     sizes: SNEAKER_SIZES,
     stock: { out: ["12"] },
+  },
+
+  /* --------------------------------------------------------------- shirts -- */
+  {
+    name: "Oxford Cotton Shirt",
+    slug: "oxford-cotton-shirt",
+    categorySlug: "shirts",
+    brandSlug: "alqaim-studio",
+    gender: Gender.MEN,
+    basePrice: 69,
+    shortDesc: "Crisp white Oxford, pressed collar.",
+    description:
+      "The shirt everything else goes with. A two-ply Oxford cotton with a soft hand and just enough structure to hold a collar through a long day, cut close through the body without pulling at the buttons. Wear it pressed with a jacket or open over a tee.",
+    material: "100% two-ply Oxford cotton, mother-of-pearl buttons",
+    tags: ["shirt", "oxford", "cotton", "office", "white"],
+    colors: [
+      { name: "White", hex: "#f4f4f2" },
+      { name: "Sky Blue", hex: "#bcd3ea" },
+      { name: "Pink", hex: "#efc6d3" },
+    ],
+    sizes: SHIRT_SIZES,
+    stock: { low: ["XXL"] },
+    flags: { isFeatured: true, isNewArrival: true },
+  },
+  {
+    name: "Plum Poplin Shirt",
+    slug: "plum-poplin-shirt",
+    categorySlug: "shirts",
+    brandSlug: "atelier-rowe",
+    gender: Gender.MEN,
+    basePrice: 75,
+    salePrice: 59,
+    shortDesc: "Fine poplin in a deep plum.",
+    description:
+      "A lightweight poplin with a smooth, cool finish — the dress shirt for warm offices and evening weddings. Plum reads as colour without shouting, and sits as well under navy as it does under grey.",
+    material: "100% cotton poplin, 120s two-ply",
+    tags: ["shirt", "poplin", "cotton", "summer", "formal"],
+    colors: [{ name: "Plum", hex: "#5b2447" }],
+    sizes: SHIRT_SIZES,
+    stock: { out: ["S"] },
+    photos: 2,
+    flags: { isNewArrival: true, isOnSale: true },
+  },
+
+  /* ------------------------------------------------------------- trousers -- */
+  {
+    name: "Selvedge Straight Jeans",
+    slug: "selvedge-straight-jeans",
+    categorySlug: "trousers",
+    brandSlug: "northline",
+    gender: Gender.MEN,
+    basePrice: 110,
+    shortDesc: "Raw indigo selvedge, straight leg.",
+    description:
+      "Fourteen-ounce selvedge denim woven on narrow looms, cut in a straight leg that neither clings nor flares. It starts deep indigo and fades to your own shape over months of wear — the reason people keep jeans like these for years.",
+    material: "14 oz cotton selvedge denim, copper rivets",
+    tags: ["jeans", "denim", "selvedge", "trousers"],
+    colors: [{ name: "Indigo", hex: "#2d3b5c" }],
+    sizes: WAIST_SIZES,
+    stock: { low: ["38"] },
+    flags: { isFeatured: true },
+  },
+  {
+    name: "Washed Black Tapered Jeans",
+    slug: "washed-black-tapered-jeans",
+    categorySlug: "trousers",
+    brandSlug: "alqaim-studio",
+    gender: Gender.MEN,
+    basePrice: 95,
+    shortDesc: "Soft washed black, tapered leg.",
+    description:
+      "Pre-washed for a lived-in black from day one, with a little stretch through the seat and a taper from the knee so they sit neatly over trainers or boots.",
+    material: "98% cotton, 2% elastane stretch denim",
+    tags: ["jeans", "denim", "black", "tapered", "trousers"],
+    colors: [{ name: "Washed Black", hex: "#2b2b2d" }],
+    sizes: WAIST_SIZES,
+    photos: 2,
+    flags: { isNewArrival: true },
   },
 ];
 

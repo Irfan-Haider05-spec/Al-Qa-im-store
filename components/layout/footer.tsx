@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Instagram, Facebook, Youtube, Mail, Phone, MapPin } from "lucide-react";
-import { prisma } from "@/lib/db/prisma";
 import { getSiteSettings } from "@/lib/settings/site";
+import { getCategoryTree } from "@/lib/products/queries";
 import { Logo } from "@/components/brand/logo";
 
 const SHOP = [
@@ -27,17 +27,12 @@ const LEGAL = [
 ];
 
 export async function Footer() {
-  const [settings, categories] = await Promise.all([
+  const [settings, tree] = await Promise.all([
     getSiteSettings(),
-    prisma.category
-      .findMany({
-        where: { isActive: true },
-        select: { slug: true, name: true },
-        orderBy: { name: "asc" },
-        take: 8,
-      })
-      .catch(() => []),
+    getCategoryTree().catch(() => []),
   ]);
+  // Departments first, then their categories, up to eight links.
+  const categories = tree.flatMap((d) => [d, ...d.children]).slice(0, 8);
 
   // Only real links become icons — an icon pointing at "#" is a dead control.
   const socials = [
@@ -60,8 +55,8 @@ export async function Footer() {
           <div>
             <Logo logoUrl={settings.logoUrl} name={settings.storeName} size="lg" />
             <p className="mt-6 max-w-xs text-sm leading-relaxed text-ivory/55">
-              Premium footwear, chosen for how it wears — performance runners,
-              everyday classics and hand-finished leather.
+              Premium footwear and clothing, chosen for how it wears and how
+              long it lasts — delivered to your door, paid for when it arrives.
             </p>
 
             {socials.length > 0 && (

@@ -94,9 +94,9 @@ export function ProductCard({
           href={href}
           tabIndex={-1}
           aria-hidden
-          className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-pill bg-ink/90 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-ivory backdrop-blur transition duration-300 md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+          className="absolute inset-x-3 bottom-3 hidden items-center justify-between rounded-pill bg-ink/90 md:flex px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-ivory backdrop-blur transition duration-300 md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100"
         >
-          {soldOut ? "View details" : "Choose size"}
+          {soldOut ? "View details" : "Choose options"}
           <ArrowUpRight className="h-4 w-4 text-gold-light" />
         </Link>
       </div>

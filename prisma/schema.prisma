@@ -82,25 +82,35 @@ model User {
 
 // ------------------------------------------------------------------ catalog
 model Brand {
-  id      String    @id @default(cuid())
-  name    String    @unique
-  slug    String    @unique
-  logoUrl String?
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  logoUrl  String?
+  // Hidden brands drop out of the shop filter; their products stay on sale.
+  isActive Boolean   @default(true)
+  position Int       @default(0)
   products Product[]
 }
 
+// Two levels: departments (Footwear, Clothing) and the categories inside them
+// (Sneakers, Shirts). A department's page and filter include its children.
 model Category {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
-  slug        String    @unique
+  slug        String     @unique
   description String?
   imageUrl    String?
-  isActive    Boolean   @default(true)
+  isActive    Boolean    @default(true)
+  position    Int        @default(0)
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
   seoTitle    String?
   seoDesc     String?
   products    Product[]
 
   @@index([isActive])
+  @@index([parentId])
 }
 
 model Product {
@@ -421,6 +431,9 @@ model SiteSettings {
   flatShipping          Decimal? @db.Decimal(10, 2)
   taxRate               Decimal? @db.Decimal(5, 4)
   analyticsId           String?
+  // Which filter groups the shop sidebar shows, in order:
+  // [{ "key": "category", "enabled": true }, …]. Null means the defaults.
+  shopFilters           Json?
 }
 
 model SEOSettings {

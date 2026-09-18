@@ -72,7 +72,7 @@ const DOCS: Record<string, Doc> = {
       {
         heading: "Returns and refunds",
         body: [
-          "You have 30 days from delivery to return an unworn item in its original packaging for a full refund. Try them on indoors — a sole that has been outside is no longer unworn.",
+          "You have 30 days from delivery to return an unworn item in its original packaging for a full refund. Try items on indoors: shoes worn outside or clothes that have been washed or worn are no longer unworn.",
           "Refunds go back to the original payment method within 14 days of us receiving the return.",
         ],
       },

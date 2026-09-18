@@ -1,6 +1,7 @@
 # Al-Qa’im
 
-A production-ready e-commerce platform for Al-Qa’im, a premium footwear store:
+A production-ready e-commerce platform for Al-Qa’im, a premium footwear and
+clothing store:
 an ink-and-gold storefront with a real-time 3D hero, a variant-aware catalogue,
 real orders and inventory, and an admin CMS that genuinely drives what
 customers see.
@@ -44,8 +45,14 @@ PostgreSQL via Prisma, Auth.js v5, Tailwind, three.js and Framer Motion.
   slides, order and timing managed in Admin → Homepage
 - "Popular right now" category pills that re-query the database via the URL
 - Editorial new-arrivals rail, category grid, campaign banner, weekly pick
+- Departments (Footwear, Clothing) holding categories (Sneakers… / Shirts,
+  Trousers), with a department mega-menu, department tiles on the homepage and
+  department/category chips on the shop page
 - Shop with search, and filters for category, brand, gender, size, colour,
-  price, rating, availability and sale — all server-side, all shareable URLs
+  price, rating, availability and sale — all server-side, all shareable URLs.
+  Sizes and colours follow the section in view (S–XXL in Shirts, waist sizes
+  in Trousers, shoe sizes in Footwear); which filter groups show, and in what
+  order, is set in Admin → Shop filters
 - Product pages with a zoomable gallery, colour/size variants, live stock,
   reviews with a rating distribution, verified-buyer review submission
   (moderated), and related products
@@ -56,7 +63,11 @@ PostgreSQL via Prisma, Auth.js v5, Tailwind, three.js and Framer Motion.
 
 - Dashboard with real revenue, orders, customers, top products and low stock
 - Products with variants, images, inventory, flags and per-product SEO
-- Categories (with photo, description and SEO), inventory adjustments,
+- Products with a **sizes, colours & stock** editor (size sets for shoes,
+  clothing and waists; one-size items supported) and a "ready to sell"
+  checklist
+- Departments and categories (with photo, description and SEO), brands
+  (logo, visibility in the filter, order), shop filter settings, inventory adjustments,
   orders, customers, a contact-form inbox, reviews, coupons, banners, users,
   site settings (including the logo) and an activity log
 - Homepage CMS: hero copy, hero slides (image, linked product, timing, order,
@@ -219,7 +230,11 @@ Admin is not a separate world — it edits the same rows the storefront reads:
 | Products → New arrival | Appears in the New Arrival rail |
 | Products → Featured | Appears in Popular right now |
 | Products → Published off | Disappears from the storefront and the sitemap |
-| Categories → photo / description | Header "Collections" menu, homepage category grid, category banner |
+| Categories → department | Where a category sits (Clothing › Shirts): menus, filters, breadcrumbs, department pages |
+| Categories → photo / description | Header "Collections" menu, homepage department tiles, category banner |
+| Brands → shown / hidden, order | The shop's Brand filter |
+| Shop filters | Which filter groups the shop sidebar shows, and their order |
+| Product → sizes, colours & stock | The colour swatches and size buttons on the product page, and what can be bought |
 | Settings → logo | Header, footer, admin sidebar (replaces the built-in Al-Qa’im mark) |
 | Settings → store name | Page titles, header, footer, emails-to-be |
 | Banners | The campaign band (respects start/end dates) |

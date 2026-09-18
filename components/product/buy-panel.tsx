@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, RotateCcw, ShieldCheck, ShoppingBag, Truck } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
@@ -76,6 +77,9 @@ export function BuyPanel({
     return map;
   }, [sizes, variants, colorId]);
 
+  // One-size products (a belt, a cap) have no size to pick.
+  const needsSize = sizes.length > 0;
+  const sizeChosen = !needsSize || sizeId != null;
   const stock = selectedVariant?.inventory?.available ?? 0;
   const totalStock = useMemo(
     () => variants.reduce((n, v) => n + (v.inventory?.available ?? 0), 0),
@@ -94,12 +98,16 @@ export function BuyPanel({
 
   /** Shared by both buttons. Resolves to true only when the line was added. */
   const submit = async () => {
-    if (!sizeId) {
+    if (!sizeChosen) {
       setError("Choose a size first.");
       return false;
     }
     if (!selectedVariant) {
-      setError("That colour and size combination isn't available.");
+      setError(
+        needsSize
+          ? "That colour and size combination isn't available."
+          : "This option isn't available right now."
+      );
       return false;
     }
 
@@ -182,7 +190,15 @@ export function BuyPanel({
 
         {sizes.length > 0 && (
           <fieldset>
-            <legend className="mb-2 text-sm font-medium">Size</legend>
+            <legend className="mb-2 flex w-full items-center justify-between text-sm font-medium">
+              Size
+              <Link
+                href="/about#sizes"
+                className="text-xs font-normal text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                Size guide
+              </Link>
+            </legend>
             <div className="flex flex-wrap gap-2">
               {sizes.map((s) => {
                 const available = stockBySize.get(s.id) ?? 0;
@@ -217,13 +233,17 @@ export function BuyPanel({
       </div>
 
       <p className="text-sm" aria-live="polite">
-        {sizeId ? (
+        {sizeChosen ? (
           stock > 5 ? (
             <span className="text-success">In stock — ships within 24 hours</span>
           ) : stock > 0 ? (
-            <span className="text-warning">Only {stock} left in this size</span>
+            <span className="text-warning">
+              Only {stock} left{needsSize ? " in this size" : ""}
+            </span>
           ) : (
-            <span className="text-danger">Sold out in this size</span>
+            <span className="text-danger">
+              {needsSize ? "Sold out in this size" : "Sold out in this colour"}
+            </span>
           )
         ) : totalStock > 0 ? (
           <span className="text-muted-foreground">Select a size to check availability</span>
@@ -249,7 +269,7 @@ export function BuyPanel({
             type="button"
             aria-label="Increase quantity"
             onClick={() => setQuantity((q) => Math.min(Math.max(stock, 1), q + 1))}
-            disabled={sizeId != null && quantity >= stock}
+            disabled={sizeChosen && quantity >= stock}
             className="grid h-12 w-12 place-items-center rounded-r-pill transition-colors hover:bg-muted disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />

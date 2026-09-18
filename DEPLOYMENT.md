@@ -112,12 +112,18 @@ Work through this once, in order, on the live site.
    it replaces the built-in mark in the header, footer and admin), contact
    email, phone, address, **currency** (e.g. `PKR`), shipping, tax and your real
    social profile URLs (leave blank to hide an icon).
-4. **Admin → Categories**: rename/add categories and give each a **photo** and
-   description — they appear in the header's Collections menu and on the
-   homepage.
-5. **Admin → Products → New**: add your products — images, colours, sizes,
-   prices, stock per variant, flags (*New arrival*, *Featured*, *Weekly pick*,
-   *On sale*) and SEO. Tick **Published** when ready.
+4. **Admin → Categories**: the store is organised into **departments**
+   (Footwear, Clothing) with **categories** inside them (Sneakers, Shirts,
+   Trousers…). Add or rename them, choose each category's department, and give
+   each a **photo** and description. A category appears in the shop once one
+   of its products is published. **Admin → Brands**: add your brands and choose
+   which show in the shop's Brand filter. **Admin → Shop filters**: choose which
+   filter groups the shop sidebar shows, and their order.
+5. **Admin → Products → New**: enter the basics and click *Create & continue*.
+   On the product's page, add **photos**, then under **Sizes, colours & stock**
+   add colours, a size set (shoes, clothing XS–XXL, waist 28–40 — or none for
+   one-size items) and the stock for each combination. The checklist at the top
+   turns green when the product can be bought; then tick **Published**.
 6. **Admin → Homepage**: hero heading and copy, and the **hero slides** — one
    transparent product cut-out per slide, the product it links to (for the
    name/price caption) and how long it holds. Also the weekly pick and the

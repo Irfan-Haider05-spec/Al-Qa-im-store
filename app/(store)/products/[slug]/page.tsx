@@ -152,6 +152,17 @@ export default async function ProductPage({
         <Link href="/shop" className="transition-colors hover:text-foreground">
           Shop
         </Link>
+        {product.category?.parent && (
+          <>
+            <span className="mx-1.5">/</span>
+            <Link
+              href={`/category/${product.category.parent.slug}`}
+              className="transition-colors hover:text-foreground"
+            >
+              {product.category.parent.name}
+            </Link>
+          </>
+        )}
         {product.category && (
           <>
             <span className="mx-1.5">/</span>
@@ -297,7 +308,7 @@ export default async function ProductPage({
             <p className="text-sm text-muted-foreground">
               {reviewState === "signed-out" ? (
                 <>
-                  Bought this pair?{" "}
+                  Bought this?{" "}
                   <Link
                     href={`/login?next=${encodeURIComponent(`/products/${product.slug}#reviews`)}`}
                     className="font-medium text-foreground underline underline-offset-4 hover:text-gold-ink"

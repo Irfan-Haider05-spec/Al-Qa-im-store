@@ -26,13 +26,13 @@ export default async function CartPage() {
           Your cart is empty
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Find your next pair in the shop.
+          Find something you love in the shop.
         </p>
         <Link
           href="/shop"
           className="mt-6 inline-flex h-11 items-center rounded-pill bg-primary px-8 font-medium text-primary-foreground hover:bg-primary-deep"
         >
-          Browse shoes
+          Browse the shop
         </Link>
       </div>
     );

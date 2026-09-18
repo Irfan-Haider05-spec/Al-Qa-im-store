@@ -124,7 +124,7 @@ export function Hero({
   return (
     <section
       aria-roledescription="carousel"
-      aria-label="Featured footwear"
+      aria-label="Featured products"
       className="surface-dark relative isolate overflow-hidden lg:min-h-[100svh]"
       data-hero-active={active}
       data-hero-shown={displayed}
@@ -286,7 +286,7 @@ export function Hero({
           </span>
 
           <div className="flex items-center gap-1">
-            <ControlButton label="Previous shoe" onClick={() => go(-1)}>
+            <ControlButton label="Previous product" onClick={() => go(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </ControlButton>
             <ControlButton
@@ -296,7 +296,7 @@ export function Hero({
             >
               {userPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
             </ControlButton>
-            <ControlButton label="Next shoe" onClick={() => go(1)}>
+            <ControlButton label="Next product" onClick={() => go(1)}>
               <ChevronRight className="h-4 w-4" />
             </ControlButton>
           </div>

@@ -10,7 +10,7 @@
  */
 import { PrismaClient, Gender, Role, OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { BANNERS, BRANDS, CATEGORIES, HERO_SLIDES, PRODUCTS } from "./catalog";
+import { BANNERS, BRANDS, CATEGORIES, DEPARTMENTS, HERO_SLIDES, PRODUCTS } from "./catalog";
 
 const prisma = new PrismaClient();
 
@@ -171,7 +171,25 @@ async function seedSettings() {
 }
 
 async function seedCatalogue() {
-  for (const c of CATEGORIES) {
+  const departmentIds = new Map<string, string>();
+  for (const [position, d] of DEPARTMENTS.entries()) {
+    const dept = await prisma.category.upsert({
+      where: { slug: d.slug },
+      update: {},
+      create: {
+        name: d.name,
+        slug: d.slug,
+        description: d.description,
+        seoTitle: d.seoTitle,
+        seoDesc: d.seoDesc,
+        position,
+      },
+    });
+    departmentIds.set(d.slug, dept.id);
+  }
+
+  for (const [position, c] of CATEGORIES.entries()) {
+    const parentId = c.department ? (departmentIds.get(c.department) ?? null) : null;
     await prisma.category.upsert({
       where: { slug: c.slug },
       update: {},
@@ -182,10 +200,20 @@ async function seedCatalogue() {
         seoTitle: c.seoTitle,
         seoDesc: c.seoDesc,
         imageUrl: c.hasImage ? `/categories/${c.slug}.webp` : null,
+        parentId,
+        position,
       },
     });
+    // Databases seeded before departments existed: file the category under
+    // its department, but never move one an admin has already placed.
+    if (parentId) {
+      await prisma.category.updateMany({
+        where: { slug: c.slug, parentId: null },
+        data: { parentId },
+      });
+    }
   }
-  console.log(`  category  ${CATEGORIES.length} categories`);
+  console.log(`  category  ${DEPARTMENTS.length} departments, ${CATEGORIES.length} categories`);
 
   for (const b of BRANDS) {
     await prisma.brand.upsert({ where: { slug: b.slug }, update: {}, create: b });
@@ -225,9 +253,9 @@ async function seedCatalogue() {
         colors: { create: p.colors },
         sizes: { create: p.sizes.map((label, position) => ({ label, position })) },
         images: {
-          create: [0, 1, 2].map((i) => ({
+          create: Array.from({ length: p.photos ?? 3 }, (_, i) => ({
             url: `/products/${p.slug}-${i + 1}.webp`,
-            alt: `${p.name} — ${["side profile", "detail", "pair"][i]}`,
+            alt: `${p.name} — ${["main view", "detail", "alternate view"][i] ?? `view ${i + 1}`}`,
             position: i,
             isPrimary: i === 0,
           })),

@@ -18,6 +18,8 @@ import {
   ScrollText,
   UserCog,
   Inbox,
+  Tags,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { cn } from "@/lib/utils/cn";
@@ -30,6 +32,8 @@ const NAV: { label: string; href: string; icon: typeof Home; perm?: Permission }
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, perm: "orders.read" },
   { label: "Products", href: "/admin/products", icon: Package, perm: "products.read" },
   { label: "Categories", href: "/admin/categories", icon: FolderTree, perm: "products.read" },
+  { label: "Brands", href: "/admin/brands", icon: Tags, perm: "products.read" },
+  { label: "Shop filters", href: "/admin/shop-filters", icon: SlidersHorizontal, perm: "settings.write" },
   { label: "Inventory", href: "/admin/inventory", icon: Boxes, perm: "products.read" },
   { label: "Orders", href: "/admin/orders", icon: ShoppingCart, perm: "orders.read" },
   { label: "Customers", href: "/admin/customers", icon: Users, perm: "customers.read" },

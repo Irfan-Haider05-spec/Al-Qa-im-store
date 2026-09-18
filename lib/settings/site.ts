@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
 import { cachedStorefront } from "@/lib/cache/storefront";
+import { normaliseFilters, type FilterSetting } from "@/lib/catalog/shop-filters";
 
 export type SiteSettingsView = {
   storeName: string;
@@ -13,6 +14,8 @@ export type SiteSettingsView = {
   freeShippingThreshold: number | null;
   taxRate: number;
   socials: { instagram?: string; facebook?: string; youtube?: string };
+  /** Shop sidebar filter groups, in order, with their on/off state. */
+  shopFilters: FilterSetting[];
 };
 
 const FALLBACK: SiteSettingsView = {
@@ -26,6 +29,7 @@ const FALLBACK: SiteSettingsView = {
   freeShippingThreshold: null,
   taxRate: 0,
   socials: {},
+  shopFilters: normaliseFilters(null),
 };
 
 /**
@@ -56,6 +60,7 @@ const readSettings = cachedStorefront(async (): Promise<SiteSettingsView> => {
           : null,
       taxRate: Number(settings.taxRate ?? 0),
       socials: (settings.socials as SiteSettingsView["socials"]) ?? {},
+      shopFilters: normaliseFilters(settings.shopFilters),
     };
   } catch {
     return FALLBACK;

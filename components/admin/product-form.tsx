@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createProduct, updateProduct } from "@/lib/admin/product-actions";
 import type { ProductFormInput } from "@/lib/validations/admin";
 import { slugify } from "@/lib/utils/format";
+import type { CategoryOption } from "@/lib/admin/catalog-options";
 
 type Option = { id: string; name: string };
 
@@ -18,7 +19,7 @@ export function ProductForm({
 }: {
   productId?: string;
   initial?: Partial<ProductFormInput>;
-  categories: Option[];
+  categories: CategoryOption[];
   brands: Option[];
 }) {
   const router = useRouter();
@@ -59,7 +60,9 @@ export function ProductForm({
         ? await updateProduct(productId, form)
         : await createProduct(form);
       if (res.ok) {
-        router.push("/admin/products");
+        // A new product goes straight to its own page for photos, sizes and
+        // stock — without those it can't be sold.
+        router.push(productId ? "/admin/products" : `/admin/products/${res.id}?new=1`);
         router.refresh();
       } else {
         setError(res.error);
@@ -154,12 +157,29 @@ export function ProductForm({
             value={form.categoryId ?? ""}
             onChange={(e) => set("categoryId", e.target.value)}
           >
-            <option value="">— none —</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            <option value="">— choose a category —</option>
+            {/* Grouped by department, e.g. Clothing › Shirts. */}
+            {[...new Set(categories.map((c) => c.department ?? ""))].map((dept) =>
+              dept ? (
+                <optgroup key={dept} label={dept}>
+                  {categories
+                    .filter((c) => c.department === dept)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </optgroup>
+              ) : (
+                categories
+                  .filter((c) => !c.department)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))
+              )
+            )}
           </select>
         </div>
         <div>
@@ -248,7 +268,7 @@ export function ProductForm({
           disabled={pending}
           className="inline-flex h-11 items-center rounded-pill bg-primary px-8 font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-50"
         >
-          {pending ? "Saving…" : productId ? "Save changes" : "Create product"}
+          {pending ? "Saving…" : productId ? "Save changes" : "Create & continue"}
         </button>
         <button
           onClick={() => router.push("/admin/products")}
@@ -258,10 +278,12 @@ export function ProductForm({
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Variants, inventory and images are managed on the Inventory page and the
-        image manager (Phase 5 part 2).
-      </p>
+      {!productId && (
+        <p className="text-xs text-muted-foreground">
+          Leave <strong>Published</strong> unticked for now — publish once the product has photos
+          and stock. New categories and brands are added under Admin → Categories and Brands.
+        </p>
+      )}
     </div>
   );
 }

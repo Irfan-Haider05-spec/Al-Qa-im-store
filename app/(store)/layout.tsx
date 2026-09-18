@@ -4,7 +4,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { getCart } from "@/lib/cart/get-cart";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getSiteSettings } from "@/lib/settings/site";
-import { getNavCategories } from "@/lib/products/queries";
+import { getCategoryTree } from "@/lib/products/queries";
 
 export default async function StoreLayout({
   children,
@@ -15,7 +15,7 @@ export default async function StoreLayout({
     getCart(),
     getCurrentUser(),
     getSiteSettings(),
-    getNavCategories().catch(() => []),
+    getCategoryTree().catch(() => []),
   ]);
 
   // The announcement is built from the real shipping settings, so it can
@@ -42,7 +42,12 @@ export default async function StoreLayout({
         cartCount={itemCount}
         storeName={settings.storeName}
         logoUrl={settings.logoUrl}
-        categories={categories}
+        departments={categories.map((d) => ({
+          slug: d.slug,
+          name: d.name,
+          imageUrl: d.imageUrl,
+          children: d.children.map((c) => ({ slug: c.slug, name: c.name })),
+        }))}
         signedIn={Boolean(user)}
         currency={settings.currency}
         announcement={announcement}

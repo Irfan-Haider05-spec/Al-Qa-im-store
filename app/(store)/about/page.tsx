@@ -14,21 +14,22 @@ export const metadata: Metadata = {
 
 const VALUES = [
   {
-    title: "Chosen for the hundredth mile",
+    title: "Chosen for how it wears",
     body: "Every style is worn before it is listed. If it isn't comfortable at the end of a long day, it doesn't make the edit.",
   },
   {
-    title: "Authentic, always",
-    body: "We buy direct and inspect every pair before it ships. No grey imports, no seconds, no surprises in the box.",
+    title: "Checked before it ships",
+    body: "Every order is inspected and packed by hand. No seconds, no surprises in the box.",
   },
   {
     title: "Made to be kept",
-    body: "Leather that ages well, soles that can be resoled, and a two-year guarantee against manufacturing faults.",
+    body: "Leather that ages well, fabrics that hold their shape, and 30 days to return anything unworn.",
   },
 ];
 
-// Approximate conversions — lasts differ between makers, so each product page
-// also notes whether a style runs large or small.
+// Approximate conversions — lasts and cuts differ between makers, so each
+// product page also notes whether a style runs large or small.
+const SHOE_HEAD = ["US", "UK", "EU", "Foot (cm)"];
 const MENS = [
   ["7", "6", "40", "25.0"],
   ["8", "7", "41", "25.8"],
@@ -44,6 +45,26 @@ const WOMENS = [
   ["8", "6", "38.5", "24.6"],
   ["9", "7", "40", "25.4"],
   ["10", "8", "41", "26.2"],
+];
+
+const SHIRT_HEAD = ["Size", "Chest (cm)", "Chest (in)", "Collar (in)"];
+const SHIRTS = [
+  ["XS", "86–91", "34–36", "14"],
+  ["S", "91–96", "36–38", "14.5"],
+  ["M", "96–102", "38–40", "15–15.5"],
+  ["L", "102–107", "40–42", "16–16.5"],
+  ["XL", "107–112", "42–44", "17–17.5"],
+  ["XXL", "112–117", "44–46", "18"],
+];
+
+const TROUSER_HEAD = ["Waist size", "Waist (cm)", "Hip (cm)", "Letter size"];
+const TROUSERS = [
+  ["28", "71", "89", "XS"],
+  ["30", "76", "94", "S"],
+  ["32", "81", "99", "M"],
+  ["34", "86", "104", "L"],
+  ["36", "91", "109", "XL"],
+  ["38", "97", "114", "XXL"],
 ];
 
 export default async function AboutPage() {
@@ -63,13 +84,13 @@ export default async function AboutPage() {
               Our story
             </p>
             <h1 className="mt-5 font-display text-[clamp(2.6rem,6vw,4.6rem)] font-medium leading-[1.02] tracking-[-0.02em] text-ivory">
-              Footwear worth <span className="italic text-gold-gradient">standing</span> in.
+              Made to be <span className="italic text-gold-gradient">worn</span>, and kept.
             </h1>
             <p className="mt-6 max-w-lg leading-relaxed text-ivory/65">
-              {settings.storeName} began with a simple frustration: shoes that
-              looked the part and gave out in a season. So we built a shop around
-              the opposite idea — fewer styles, each one chosen for how it wears
-              rather than how it photographs.
+              {settings.storeName} began with a simple frustration: shoes and
+              clothes that looked the part and gave out in a season. So we built a
+              shop around the opposite idea — fewer styles, each one chosen for how
+              it wears rather than how it photographs.
             </p>
           </div>
           <div className="hidden justify-center lg:flex">
@@ -95,15 +116,17 @@ export default async function AboutPage() {
           <SectionHeading
             eyebrow="Fit"
             title="Size guide"
-            description="Measure your foot heel to longest toe, standing, at the end of the day — then read across. Between sizes? Go up half a size."
+            description="Shoes: measure your foot heel to longest toe, standing, at the end of the day. Shirts: measure around the fullest part of the chest. Trousers: measure your natural waist. Between sizes? Go up one."
           />
           <div className="mt-12 grid gap-8 lg:grid-cols-2">
-            <SizeTable caption="Men’s" rows={MENS} />
-            <SizeTable caption="Women’s" rows={WOMENS} />
+            <SizeTable caption="Shoes — men’s" head={SHOE_HEAD} rows={MENS} />
+            <SizeTable caption="Shoes — women’s" head={SHOE_HEAD} rows={WOMENS} />
+            <SizeTable caption="Shirts" head={SHIRT_HEAD} rows={SHIRTS} />
+            <SizeTable caption="Trousers" head={TROUSER_HEAD} rows={TROUSERS} />
           </div>
           <p className="mt-6 text-sm text-muted-foreground">
-            Conversions are approximate — lasts vary between makers, so each
-            product page notes when a style runs large or small.
+            Conversions are approximate — lasts and cuts vary between makers, so
+            each product page notes when a style runs large or small.
           </p>
         </div>
       </section>
@@ -114,7 +137,7 @@ export default async function AboutPage() {
           <h2 className="mt-3 font-display text-3xl">Payment options</h2>
           <p className="mt-4 leading-relaxed text-muted-foreground">
             We currently accept <strong className="font-semibold text-foreground">cash on delivery</strong>:
-            you pay the courier when your order arrives, so you see the pair
+            you pay the courier when your order arrives, so you see your order
             before you part with anything. Card payment will be offered here as
             soon as it is live — we won’t take a card number until then.
           </p>
@@ -129,11 +152,7 @@ export default async function AboutPage() {
             </li>
             <li>
               <strong className="font-semibold text-foreground">Returns:</strong> 30 days from delivery for
-              unworn pairs in their original box.
-            </li>
-            <li>
-              <strong className="font-semibold text-foreground">Guarantee:</strong> two years against
-              manufacturing faults.
+              unworn items in their original packaging.
             </li>
           </ul>
           <Link
@@ -149,7 +168,7 @@ export default async function AboutPage() {
   );
 }
 
-function SizeTable({ caption, rows }: { caption: string; rows: string[][] }) {
+function SizeTable({ caption, head, rows }: { caption: string; head: string[]; rows: string[][] }) {
   return (
     <div className="overflow-x-auto rounded-card border border-border bg-background">
       <table className="w-full text-sm">
@@ -158,7 +177,7 @@ function SizeTable({ caption, rows }: { caption: string; rows: string[][] }) {
         </caption>
         <thead>
           <tr className="text-left">
-            {["US", "UK", "EU", "Foot (cm)"].map((h) => (
+            {head.map((h) => (
               <th key={h} scope="col" className="eyebrow px-5 py-3 text-[0.62rem] text-muted-foreground">
                 {h}
               </th>

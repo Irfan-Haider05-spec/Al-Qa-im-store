@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImageIcon, Pencil, Trash2 } from "lucide-react";
+import { CornerDownRight, ImageIcon, Pencil, Trash2 } from "lucide-react";
 import {
   createCategory,
   updateCategory,
@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin/category-actions";
 import { ImageUpload } from "@/components/admin/image-upload";
 import { slugify } from "@/lib/utils/format";
+import { cn } from "@/lib/utils/cn";
 import type { CategoryFormInput } from "@/lib/validations/admin";
 
 type Cat = {
@@ -18,10 +19,12 @@ type Cat = {
   slug: string;
   description: string | null;
   imageUrl: string | null;
+  parentId: string | null;
+  position: number;
   isActive: boolean;
   seoTitle: string | null;
   seoDesc: string | null;
-  _count: { products: number };
+  _count: { products: number; children: number };
 };
 
 /** Every field the action expects, taken from the stored row. */
@@ -31,6 +34,8 @@ function toForm(c: Cat): CategoryFormInput {
     slug: c.slug,
     description: c.description ?? "",
     imageUrl: c.imageUrl ?? "",
+    parentId: c.parentId ?? "",
+    position: c.position,
     isActive: c.isActive,
     seoTitle: c.seoTitle ?? "",
     seoDesc: c.seoDesc ?? "",
@@ -40,14 +45,31 @@ function toForm(c: Cat): CategoryFormInput {
 const input =
   "w-full rounded-control border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none";
 
+/**
+ * Departments (Footwear, Clothing) and the categories inside them (Sneakers,
+ * Shirts). Shoppers see a department in the menu once any product in it is
+ * published; empty ones stay out of sight until then.
+ */
 export function CategoryManager({ categories }: { categories: Cat[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [parentId, setParentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<CategoryFormInput | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const departments = useMemo(() => categories.filter((c) => !c.parentId), [categories]);
+  // Departments in order, each followed by its own categories.
+  const rows = useMemo(
+    () =>
+      departments.flatMap((d) => [
+        { cat: d, depth: 0 },
+        ...categories.filter((c) => c.parentId === d.id).map((c) => ({ cat: c, depth: 1 })),
+      ]),
+    [categories, departments]
+  );
 
   function create() {
     setError(null);
@@ -57,6 +79,8 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
         slug: slug || slugify(name),
         description: "",
         imageUrl: "",
+        parentId,
+        position: 0,
         isActive: true,
         seoTitle: "",
         seoDesc: "",
@@ -103,7 +127,7 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
   }
 
   function remove(c: Cat) {
-    if (!window.confirm(`Delete the category "${c.name}"?`)) return;
+    if (!window.confirm(`Delete "${c.name}"?`)) return;
     setError(null);
     startTransition(async () => {
       const res = await deleteCategory(c.id);
@@ -118,42 +142,67 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
   return (
     <div className="space-y-6">
       {/* create row */}
-      <div className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-background p-4">
-        <div>
-          <label htmlFor="new-cat-name" className="mb-1 block text-sm font-medium">
-            Name
-          </label>
-          <input
-            id="new-cat-name"
-            className={input}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setSlug(slugify(e.target.value));
-            }}
-          />
+      <div className="rounded-card border border-border bg-background p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="new-cat-name" className="mb-1 block text-sm font-medium">
+              Name
+            </label>
+            <input
+              id="new-cat-name"
+              className={input}
+              value={name}
+              placeholder="e.g. Shirts"
+              onChange={(e) => {
+                setName(e.target.value);
+                setSlug(slugify(e.target.value));
+              }}
+            />
+          </div>
+          <div>
+            <label htmlFor="new-cat-slug" className="mb-1 block text-sm font-medium">
+              Slug
+            </label>
+            <input
+              id="new-cat-slug"
+              className={input}
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="new-cat-parent" className="mb-1 block text-sm font-medium">
+              Inside department
+            </label>
+            <select
+              id="new-cat-parent"
+              className={input}
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+            >
+              <option value="">— none: this is a new department —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={create}
+            disabled={pending || !name}
+            className="inline-flex h-10 items-center rounded-pill bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-50"
+          >
+            Add
+          </button>
         </div>
-        <div>
-          <label htmlFor="new-cat-slug" className="mb-1 block text-sm font-medium">
-            Slug
-          </label>
-          <input
-            id="new-cat-slug"
-            className={input}
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={create}
-          disabled={pending || !name}
-          className="inline-flex h-10 items-center rounded-pill bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-50"
-        >
-          Add category
-        </button>
-        <p className="basis-full text-xs text-muted-foreground">
-          After adding, use Edit to set the photo shown in the menu and on the homepage.
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          A <strong className="text-foreground">department</strong> groups related categories —
+          e.g. <em>Clothing</em> with <em>Shirts</em> and <em>Trousers</em> inside it. Products
+          go into a category; a department&apos;s page shows everything in its categories. New
+          categories appear in the shop as soon as one of their products is published. Use the
+          pencil to add a photo, description and SEO.
         </p>
       </div>
 
@@ -168,19 +217,28 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50 text-left">
-              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Slug</th>
               <th className="px-4 py-3 font-medium">Products</th>
+              <th className="px-4 py-3 font-medium">Order</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {categories.map((c) => (
+            {rows.map(({ cat: c, depth }) => (
               <Fragment key={c.id}>
-                <tr className="border-b border-border last:border-0">
+                <tr
+                  className={cn(
+                    "border-b border-border last:border-0",
+                    depth === 0 && "bg-muted/25"
+                  )}
+                >
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                    <div className={cn("flex items-center gap-3", depth === 1 && "pl-6")}>
+                      {depth === 1 && (
+                        <CornerDownRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                      )}
                       <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-control bg-muted">
                         {c.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element -- admin thumbnail
@@ -189,11 +247,28 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
                           <ImageIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
                         )}
                       </span>
-                      <span className="font-medium">{c.name}</span>
+                      <span>
+                        <span className="block font-medium">{c.name}</span>
+                        {depth === 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Department · {c._count.children} categor
+                            {c._count.children === 1 ? "y" : "ies"}
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{c.slug}</td>
-                  <td className="px-4 py-3">{c._count.products}</td>
+                  <td className="px-4 py-3">
+                    {depth === 0
+                      ? // A department's count includes everything in its categories.
+                        c._count.products +
+                        categories
+                          .filter((child) => child.parentId === c.id)
+                          .reduce((sum, child) => sum + child._count.products, 0)
+                      : c._count.products}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.position}</td>
                   <td className="px-4 py-3">
                     <button
                       type="button"
@@ -205,7 +280,7 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {c.isActive ? "Active" : "Inactive"}
+                      {c.isActive ? "Active" : "Hidden"}
                     </button>
                   </td>
                   <td className="px-4 py-3">
@@ -233,7 +308,7 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
 
                 {editing === c.id && draft && (
                   <tr className="border-b border-border bg-muted/30">
-                    <td colSpan={5} className="px-4 py-5">
+                    <td colSpan={6} className="px-4 py-5">
                       <div className="grid gap-5 lg:grid-cols-[auto_1fr_1fr]">
                         <ImageUpload
                           label="Photo"
@@ -250,13 +325,48 @@ export function CategoryManager({ categories }: { categories: Cat[] }) {
                               onChange={(e) => set("name", e.target.value)}
                             />
                           </div>
+                          <div className="grid grid-cols-[1fr_6rem] gap-3">
+                            <div>
+                              <label className="mb-1 block text-sm font-medium">Slug</label>
+                              <input
+                                className={input}
+                                value={draft.slug}
+                                onChange={(e) => set("slug", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-sm font-medium">Order</label>
+                              <input
+                                type="number"
+                                min={0}
+                                className={input}
+                                value={draft.position}
+                                onChange={(e) => set("position", Number(e.target.value) || 0)}
+                              />
+                            </div>
+                          </div>
                           <div>
-                            <label className="mb-1 block text-sm font-medium">Slug</label>
-                            <input
+                            <label className="mb-1 block text-sm font-medium">Department</label>
+                            <select
                               className={input}
-                              value={draft.slug}
-                              onChange={(e) => set("slug", e.target.value)}
-                            />
+                              value={draft.parentId ?? ""}
+                              disabled={c._count.children > 0}
+                              onChange={(e) => set("parentId", e.target.value)}
+                            >
+                              <option value="">— none: this is a department —</option>
+                              {departments
+                                .filter((d) => d.id !== c.id)
+                                .map((d) => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.name}
+                                  </option>
+                                ))}
+                            </select>
+                            {c._count.children > 0 && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Departments with categories inside stay at the top level.
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label className="mb-1 block text-sm font-medium">Description</label>

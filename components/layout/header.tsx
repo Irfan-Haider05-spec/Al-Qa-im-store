@@ -18,7 +18,12 @@ const NAV = [
   { label: "Contact", href: "/contact" },
 ];
 
-export type HeaderCategory = { slug: string; name: string; imageUrl: string | null };
+export type HeaderDepartment = {
+  slug: string;
+  name: string;
+  imageUrl: string | null;
+  children: { slug: string; name: string }[];
+};
 
 /**
  * The site header: a thin announcement line, then the bar itself.
@@ -32,7 +37,7 @@ export function Header({
   cartCount = 0,
   storeName,
   logoUrl,
-  categories = [],
+  departments = [],
   signedIn = false,
   currency = "USD",
   announcement,
@@ -40,7 +45,7 @@ export function Header({
   cartCount?: number;
   storeName: string;
   logoUrl?: string | null;
-  categories?: HeaderCategory[];
+  departments?: HeaderDepartment[];
   signedIn?: boolean;
   currency?: string;
   announcement?: string;
@@ -97,6 +102,9 @@ export function Header({
   }, [collectionsOpen]);
 
   const solid = !overHero || scrolled || collectionsOpen;
+  // A store with departments (Footwear → Sneakers, Clothing → Shirts) gets a
+  // column per department; a flat one gets a grid of category tiles.
+  const tiered = departments.some((d) => d.children.length > 0);
 
   return (
     <header className="fixed inset-x-0 top-0 z-40">
@@ -133,7 +141,7 @@ export function Header({
               </NavLink>
             ))}
 
-            {categories.length > 0 && (
+            {departments.length > 0 && (
               <div ref={collectionsRef} className="relative">
                 <button
                   type="button"
@@ -160,34 +168,57 @@ export function Header({
                       animate={{ opacity: 1, y: 0 }}
                       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
                       transition={{ duration: 0.2 }}
-                      className="surface-dark absolute left-1/2 top-full mt-5 w-[min(44rem,80vw)] -translate-x-1/2 rounded-card border border-white/10 p-5 shadow-hover"
+                      className={cn(
+                        "surface-dark absolute left-1/2 top-full mt-5 -translate-x-1/2 rounded-card border border-white/10 p-5 shadow-hover",
+                        tiered
+                          ? departments.length > 2
+                            ? "w-[min(60rem,90vw)]"
+                            : "w-[min(40rem,86vw)]"
+                          : "w-[min(44rem,80vw)]"
+                      )}
                     >
-                      <ul className="grid grid-cols-3 gap-3">
-                        {categories.map((c) => (
-                          <li key={c.slug}>
-                            <Link
-                              href={`/category/${c.slug}`}
-                              className="group block overflow-hidden rounded-control"
-                            >
-                              <span className="relative block aspect-[4/3] overflow-hidden bg-white/5">
-                                {c.imageUrl && (
-                                  <Image
-                                    src={c.imageUrl}
-                                    alt=""
-                                    fill
-                                    sizes="220px"
-                                    className="object-cover opacity-80 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
-                                  />
-                                )}
-                                <span className="absolute inset-0 bg-gradient-to-t from-ink/80 to-transparent" />
-                                <span className="absolute bottom-2.5 left-3 font-display text-base text-ivory">
-                                  {c.name}
-                                </span>
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
+                      {tiered ? (
+                        <div
+                          className="grid gap-6"
+                          style={{ gridTemplateColumns: `repeat(${Math.min(departments.length, 4)}, minmax(0, 1fr))` }}
+                        >
+                          {departments.slice(0, 4).map((d) => (
+                            <div key={d.slug}>
+                              <CategoryTile slug={d.slug} name={d.name} imageUrl={d.imageUrl} />
+                              {d.children.length > 0 && (
+                                <ul className="mt-4 space-y-2.5">
+                                  {d.children.map((c) => (
+                                    <li key={c.slug}>
+                                      <Link
+                                        href={`/category/${c.slug}`}
+                                        className="text-sm text-ivory/75 transition-colors hover:text-gold-light"
+                                      >
+                                        {c.name}
+                                      </Link>
+                                    </li>
+                                  ))}
+                                  <li>
+                                    <Link
+                                      href={`/category/${d.slug}`}
+                                      className="eyebrow text-[0.62rem] text-gold-light hover:text-ivory"
+                                    >
+                                      All {d.name} →
+                                    </Link>
+                                  </li>
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <ul className="grid grid-cols-3 gap-3">
+                          {departments.map((c) => (
+                            <li key={c.slug}>
+                              <CategoryTile slug={c.slug} name={c.name} imageUrl={c.imageUrl} />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <Link
                         href="/shop"
                         className="eyebrow mt-4 inline-block text-gold-light hover:text-ivory"
@@ -309,22 +340,36 @@ export function Header({
                 </ul>
               </nav>
 
-              {categories.length > 0 && (
-                <>
-                  <p className="eyebrow mt-10 text-gold-light">Collections</p>
-                  <ul className="mt-4 grid grid-cols-2 gap-2">
-                    {categories.map((c) => (
-                      <li key={c.slug}>
-                        <Link
-                          href={`/category/${c.slug}`}
-                          className="block rounded-control border border-white/10 px-3 py-2.5 text-sm text-ivory/85 transition-colors hover:border-gold/60 hover:text-ivory"
-                        >
-                          {c.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </>
+              {departments.length > 0 && (
+                <div className="mt-10 space-y-7">
+                  {(tiered ? departments : [{ slug: "", name: "Collections", imageUrl: null, children: departments }]).map(
+                    (d) => (
+                      <div key={d.slug || "all"}>
+                        {d.slug ? (
+                          <Link href={`/category/${d.slug}`} className="eyebrow text-gold-light hover:text-ivory">
+                            {d.name} →
+                          </Link>
+                        ) : (
+                          <p className="eyebrow text-gold-light">{d.name}</p>
+                        )}
+                        {d.children.length > 0 && (
+                          <ul className="mt-3.5 grid grid-cols-2 gap-2">
+                            {d.children.map((c) => (
+                              <li key={c.slug}>
+                                <Link
+                                  href={`/category/${c.slug}`}
+                                  className="block rounded-control border border-white/10 px-3 py-2.5 text-sm text-ivory/85 transition-colors hover:border-gold/60 hover:text-ivory"
+                                >
+                                  {c.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
               )}
 
               <Link
@@ -366,6 +411,27 @@ function NavLink({
       {active && (
         <span className="absolute -bottom-2 left-1/2 h-px w-5 -translate-x-1/2 bg-gold" />
       )}
+    </Link>
+  );
+}
+
+/** Photo tile for a department or category in the Collections menu. */
+function CategoryTile({ slug, name, imageUrl }: { slug: string; name: string; imageUrl: string | null }) {
+  return (
+    <Link href={`/category/${slug}`} className="group block overflow-hidden rounded-control">
+      <span className="relative block aspect-[4/3] overflow-hidden bg-white/5">
+        {imageUrl && (
+          <Image
+            src={imageUrl}
+            alt=""
+            fill
+            sizes="240px"
+            className="object-cover opacity-80 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
+          />
+        )}
+        <span className="absolute inset-0 bg-gradient-to-t from-ink/80 to-transparent" />
+        <span className="absolute bottom-2.5 left-3 font-display text-base text-ivory">{name}</span>
+      </span>
     </Link>
   );
 }

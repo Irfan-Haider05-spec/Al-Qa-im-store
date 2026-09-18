@@ -161,6 +161,36 @@
         "1631287381310-925554130169",
         "1559506026-181ed433f0b0"
       ]
+    },
+    {
+      "slug": "oxford-cotton-shirt",
+      "photos": [
+        "1603252109303-2751441dd157",
+        "1603252110481-7ba873bf42ab",
+        "1603251579431-8041402bdeda"
+      ]
+    },
+    {
+      "slug": "plum-poplin-shirt",
+      "photos": [
+        "1602810318660-d2c46b750f88",
+        "1602810318383-e386cc2a3ccf"
+      ]
+    },
+    {
+      "slug": "selvedge-straight-jeans",
+      "photos": [
+        "1576995853123-5a10305d93c0",
+        "1515459961680-58264ee27219",
+        "1542574621-e088a4464f7e"
+      ]
+    },
+    {
+      "slug": "washed-black-tapered-jeans",
+      "photos": [
+        "1718252540511-e958742e4165",
+        "1579236214659-e27944d8bcd5"
+      ]
     }
   ],
   "_heroReadme": [
@@ -236,6 +266,14 @@
     {
       "slug": "boots",
       "photo": "1549290127-7f758fdadff7"
+    },
+    {
+      "slug": "shirts",
+      "photo": "1603252110971-b8a57087be18"
+    },
+    {
+      "slug": "trousers",
+      "photo": "1551619873-fcaaf90f88b5"
     }
   ]
 }

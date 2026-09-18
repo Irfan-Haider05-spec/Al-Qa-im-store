@@ -113,7 +113,29 @@ export async function togglePublish(id: string, publish: boolean) {
 
 export async function deleteProduct(id: string) {
   const admin = await requirePermission("products.delete");
-  await prisma.product.delete({ where: { id } });
+
+  // Order history points at the product's variants, so a product that has
+  // been sold can't be removed without breaking past orders. Unpublishing
+  // takes it off the store just the same.
+  const ordered = await prisma.orderItem.count({ where: { variant: { productId: id } } });
+  if (ordered > 0) {
+    await prisma.product.update({
+      where: { id },
+      data: { isPublished: false, isFeatured: false, isNewArrival: false, isWeeklyPick: false },
+    });
+    revalidatePath("/admin/products");
+    revalidateStorefront();
+    return {
+      ok: false,
+      error: `This product appears in ${ordered} past order line(s), so it was unpublished instead of deleted.`,
+    };
+  }
+
+  await prisma.$transaction([
+    prisma.cartItem.deleteMany({ where: { variant: { productId: id } } }),
+    prisma.wishlistItem.deleteMany({ where: { productId: id } }),
+    prisma.product.delete({ where: { id } }),
+  ]);
   await logActivity({
     userId: admin.id,
     action: "product.deleted",

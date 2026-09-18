@@ -65,7 +65,7 @@ export function HeroSlideManager({
       <div>
         <h2 className="font-display text-lg font-semibold">Hero slides</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          The rotating shoes in the homepage hero. Transparent PNG cut-outs look
+          The rotating products in the homepage hero. Transparent PNG cut-outs look
           best — {slides.filter((s) => s.isActive).length} active.
         </p>
       </div>
@@ -196,7 +196,7 @@ export function HeroSlideManager({
         <h3 className="mb-3 text-sm font-semibold">Add a slide</h3>
         <div className="flex flex-wrap items-end gap-4">
           <ImageUpload
-            label="Shoe cut-out"
+            label="Product cut-out"
             value={draft.imageUrl}
             onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
           />

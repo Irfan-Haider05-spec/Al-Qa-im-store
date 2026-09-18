@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
-import { getProducts, type SortKey } from "@/lib/products/queries";
+import { getCategoryTree, getProducts, type SortKey } from "@/lib/products/queries";
 import { getSiteSettings } from "@/lib/settings/site";
 import { getWishlistProductIds } from "@/lib/account/wishlist-actions";
 import { ProductCard } from "@/components/product/product-card";
@@ -62,14 +62,17 @@ export default async function CategoryPage({
   const { slug } = await params;
   const sp = await searchParams;
 
-  const category = await prisma.category.findUnique({ where: { slug } });
+  const category = await prisma.category.findUnique({
+    where: { slug },
+    include: { parent: { select: { slug: true, name: true } } },
+  });
   if (!category || !category.isActive) notFound();
 
   const requestedSort = str(sp.sort) as SortKey | undefined;
   const page = Math.max(1, Number(str(sp.page) ?? 1) || 1);
   const perPage = 12;
 
-  const [{ products, total, totalPages }, settings, saved] = await Promise.all([
+  const [{ products, total, totalPages }, settings, saved, tree] = await Promise.all([
     getProducts({
       category: slug,
       sort: requestedSort && SORT_KEYS.includes(requestedSort) ? requestedSort : "featured",
@@ -78,7 +81,15 @@ export default async function CategoryPage({
     }),
     getSiteSettings(),
     getWishlistProductIds(),
+    getCategoryTree(),
   ]);
+
+  // A department lists the categories inside it; a category lists its
+  // siblings, so shoppers can move sideways without going back to the shop.
+  const department = tree.find(
+    (d) => d.slug === slug || d.children.some((c) => c.slug === slug)
+  );
+  const related = department?.children ?? [];
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
   const jsonLd = {
@@ -143,6 +154,17 @@ export default async function CategoryPage({
             <Link href="/shop" className="transition-colors hover:text-white">
               Shop
             </Link>
+            {category.parent && (
+              <>
+                <span className="mx-1.5">/</span>
+                <Link
+                  href={`/category/${category.parent.slug}`}
+                  className="transition-colors hover:text-white"
+                >
+                  {category.parent.name}
+                </Link>
+              </>
+            )}
             <span className="mx-1.5">/</span>
             <span className="text-white">{category.name}</span>
           </nav>
@@ -152,6 +174,19 @@ export default async function CategoryPage({
           </h1>
           {category.description && (
             <p className="mt-5 max-w-2xl leading-relaxed text-ivory/70">{category.description}</p>
+          )}
+
+          {department && related.length > 0 && (
+            <nav aria-label={`${department.name} categories`} className="mt-8 flex flex-wrap gap-2">
+              <CategoryLink href={`/category/${department.slug}`} active={department.slug === slug}>
+                All {department.name}
+              </CategoryLink>
+              {related.map((c) => (
+                <CategoryLink key={c.slug} href={`/category/${c.slug}`} active={c.slug === slug}>
+                  {c.name}
+                </CategoryLink>
+              ))}
+            </nav>
           )}
         </div>
       </header>
@@ -194,5 +229,29 @@ export default async function CategoryPage({
         <Pagination page={page} totalPages={totalPages} makeHref={makeHref} />
       </div>
     </div>
+  );
+}
+
+function CategoryLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? "inline-flex h-9 items-center rounded-pill bg-gold-gradient px-4 text-[0.8rem] font-semibold text-ink"
+          : "inline-flex h-9 items-center rounded-pill border border-white/20 px-4 text-[0.8rem] text-ivory/80 transition-colors hover:border-gold-light hover:text-ivory"
+      }
+    >
+      {children}
+    </Link>
   );
 }

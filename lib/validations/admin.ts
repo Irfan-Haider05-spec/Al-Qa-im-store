@@ -49,9 +49,27 @@ export const categoryFormSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug: lowercase, numbers, hyphens only"),
   description: z.string().max(1000).optional().or(z.literal("")),
   imageUrl: optionalImageUrlSchema,
+  /** Empty for a department (top level); a department's id for a category inside it. */
+  parentId: z.string().max(64).optional().or(z.literal("")),
+  position: z.coerce.number().int().min(0).max(999).default(0),
   isActive: z.boolean().default(true),
   seoTitle: z.string().max(120).optional().or(z.literal("")),
   seoDesc: z.string().max(320).optional().or(z.literal("")),
 });
 
 export type CategoryFormInput = z.infer<typeof categoryFormSchema>;
+
+export const brandFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(60),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .regex(/^[a-z0-9-]+$/, "Slug: lowercase, numbers, hyphens only"),
+  logoUrl: optionalImageUrlSchema,
+  isActive: z.boolean().default(true),
+  position: z.coerce.number().int().min(0).max(999).default(0),
+});
+
+export type BrandFormInput = z.infer<typeof brandFormSchema>;

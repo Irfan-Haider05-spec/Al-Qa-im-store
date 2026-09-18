@@ -8,8 +8,8 @@ export const BRAND = {
   name: "Al-Qa’im",
   /** Plain-ASCII form for contexts that mangle typographic quotes (email subjects, filenames). */
   asciiName: "Al-Qa'im",
-  tagline: "Premium footwear, crafted to be worn",
+  tagline: "Premium footwear & clothing",
   description:
-    "Al-Qa’im — premium sneakers, performance runners, leather Oxfords and boots, chosen for how they wear. Complimentary delivery over $100.",
+    "Al-Qa’im — premium footwear and clothing: sneakers, leather shoes and boots, shirts and trousers, chosen for how they wear. Cash on delivery.",
   themeColor: "#0B0B0C",
 } as const;

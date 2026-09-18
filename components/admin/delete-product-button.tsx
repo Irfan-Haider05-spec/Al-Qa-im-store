@@ -27,7 +27,9 @@ export function DeleteProductButton({ id }: { id: string }) {
       <button
         onClick={() =>
           startTransition(async () => {
-            await deleteProduct(id);
+            const res = await deleteProduct(id);
+            // Sold products are unpublished rather than deleted; say so.
+            if (!res.ok && "error" in res) window.alert(res.error);
             router.push("/admin/products");
             router.refresh();
           })

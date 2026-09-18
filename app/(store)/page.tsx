@@ -52,7 +52,7 @@ export default async function HomePage({
   const { popular } = await searchParams;
 
   const [
-    { homepage, categories, newArrivals, weeklyPick, banner },
+    { homepage, categories, departments, newArrivals, weeklyPick, banner },
     heroSlides,
     popularProducts,
     reviews,
@@ -85,7 +85,7 @@ export default async function HomePage({
             : "Tracked delivery",
       body: describeShipping(settings),
     },
-    { Icon: RotateCcw, title: "30-day returns", body: "Try them at home. Unworn pairs come back free." },
+    { Icon: RotateCcw, title: "30-day returns", body: "Try it at home. Unworn items come back free." },
     // Only promises the store actually keeps: COD is the live payment method,
     // and card details never reach our servers.
     { Icon: Banknote, title: "Cash on delivery", body: "Pay when your order arrives — no card needed." },
@@ -135,7 +135,7 @@ export default async function HomePage({
           ...slide,
           alt: slide.product
             ? `${slide.product.name}`
-            : `${settings.storeName} featured shoe ${i + 1}`,
+            : `${settings.storeName} featured product ${i + 1}`,
         }))}
       />
 
@@ -221,31 +221,88 @@ export default async function HomePage({
               />
             </FadeIn>
 
-            <Stagger className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
-              {categories.map((category, i) => (
-                <StaggerItem key={category.slug} className={i === 0 ? "col-span-2 sm:col-span-1" : undefined}>
-                  <Link
-                    href={`/category/${category.slug}`}
-                    className="group relative block aspect-[3/4] overflow-hidden rounded-card bg-white/5"
-                  >
-                    {category.imageUrl && (
-                      <Image
-                        src={category.imageUrl}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                        className="object-cover opacity-80 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
-                      />
-                    )}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
-                    <span className="absolute inset-x-0 bottom-0 flex items-end justify-between p-5">
-                      <span className="font-display text-xl text-ivory">{category.name}</span>
-                      <ArrowRight className="h-4 w-4 -translate-x-1 text-gold-light opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
-                    </span>
-                  </Link>
-                </StaggerItem>
-              ))}
-            </Stagger>
+            {departments.length > 1 ? (
+              // A store with several departments leads with them — Footwear,
+              // Clothing — each listing the categories inside it.
+              <Stagger
+                className={
+                  departments.length > 2
+                    ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                    : "grid gap-4 md:grid-cols-2"
+                }
+              >
+                {departments.map((d) => (
+                  <StaggerItem key={d.slug}>
+                    <div className="group relative aspect-[4/5] overflow-hidden rounded-card bg-white/5 sm:aspect-[16/12] lg:aspect-[16/11]">
+                      {d.imageUrl && (
+                        <Image
+                          src={d.imageUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                          className="object-cover opacity-75 transition duration-700 group-hover:scale-[1.03] group-hover:opacity-90"
+                        />
+                      )}
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink via-ink/35 to-transparent" />
+                      {/* Whole tile opens the department; the chips sit above it. */}
+                      <Link href={`/category/${d.slug}`} aria-label={`Shop ${d.name}`} className="absolute inset-0" />
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-6 sm:p-8">
+                        <p className="eyebrow text-[0.62rem] text-gold-light">
+                          {d.productCount} {d.productCount === 1 ? "piece" : "pieces"}
+                        </p>
+                        <h3 className="mt-2 flex items-center gap-3 font-display text-[clamp(2rem,3.4vw,3rem)] font-medium leading-none text-ivory">
+                          {d.name}
+                          <ArrowRight
+                            className="h-6 w-6 -translate-x-1 text-gold-light opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100"
+                            aria-hidden
+                          />
+                        </h3>
+                        {d.children.length > 0 && (
+                          <ul className="pointer-events-auto mt-5 flex flex-wrap gap-2">
+                            {d.children.map((c) => (
+                              <li key={c.slug}>
+                                <Link
+                                  href={`/category/${c.slug}`}
+                                  className="inline-flex h-9 items-center rounded-pill border border-white/25 bg-ink/40 px-4 text-[0.8rem] text-ivory/90 backdrop-blur-sm transition-colors hover:border-gold-light hover:text-ivory"
+                                >
+                                  {c.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            ) : (
+              <Stagger className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+                {categories.map((category, i) => (
+                  <StaggerItem key={category.slug} className={i === 0 ? "col-span-2 sm:col-span-1" : undefined}>
+                    <Link
+                      href={`/category/${category.slug}`}
+                      className="group relative block aspect-[3/4] overflow-hidden rounded-card bg-white/5"
+                    >
+                      {category.imageUrl && (
+                        <Image
+                          src={category.imageUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                          className="object-cover opacity-80 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
+                        />
+                      )}
+                      <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
+                      <span className="absolute inset-x-0 bottom-0 flex items-end justify-between p-5">
+                        <span className="font-display text-xl text-ivory">{category.name}</span>
+                        <ArrowRight className="h-4 w-4 -translate-x-1 text-gold-light opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
+                      </span>
+                    </Link>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            )}
           </div>
         </section>
       )}
