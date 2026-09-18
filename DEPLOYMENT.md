@@ -1,138 +1,167 @@
-# Shoe Express — Deployment Guide
+# Al-Qa’im — Deployment & Launch Guide
 
-This walks you from a fresh clone to a live production site on **Vercel +
-Supabase**. Every step is a real command or dashboard action.
+From this repository to a live store on **Vercel + Supabase**, then from a demo
+catalogue to your own products. Every step is a real command or dashboard
+action.
 
 ---
 
 ## 0. Prerequisites
 
 - Node.js 20+ locally
-- A Supabase project (you have one)
-- A Vercel account (free tier is fine)
-- This repository pushed to GitHub/GitLab
+- A Supabase project (the current one is in **ap-south-1 / Mumbai**)
+- A Vercel account (the free tier is fine to start)
+- This repository on GitHub
 
 ---
 
-## 1. Local setup & verification (do this first)
+## 1. Local setup & verification
 
 ```bash
 npm install                 # also runs `prisma generate`
 cp .env.example .env        # then fill in the values (see §2)
-npm run db:push             # create tables in Supabase
-npm run assets:build        # download + process the product photography
-npm run db:seed             # seed admin, products, reviews, coupons, CMS
+npm run db:push             # create/update tables in Supabase
+npm run assets:build        # download + process the demo photography
+npm run db:seed             # admin, settings, CMS copy, demo catalogue
 npm run dev                 # http://localhost:3000
 ```
 
-**Before deploying, confirm the production build succeeds locally:**
+Before deploying, confirm the production build passes:
 
 ```bash
 npm run build               # prisma generate + next build — must pass clean
-npm run start               # serve the production build on :3000
+npm run start               # serve it on :3000
 ```
 
-If `npm run build` passes, you are green to deploy. (This is the step that can't
-run in a restricted sandbox because Prisma downloads its query engine at
-generate-time; on any normal machine/CI it just works.)
+> On Windows, stop `npm run dev` before `npm run build` — the running dev
+> server locks Prisma's engine file and the build fails with `EPERM`.
 
 ---
 
 ## 2. Environment variables
 
-From **Supabase → Connect → ORMs → Prisma**, copy both URLs:
+From **Supabase → Connect → ORMs → Prisma**, copy both URLs.
 
-| Variable | Where | Notes |
+| Variable | Value | Notes |
 | --- | --- | --- |
 | `DATABASE_URL` | Transaction pooler (port 6543, `?pgbouncer=true`) | runtime |
-| `DIRECT_URL` | Direct connection (port 5432) | migrations only |
-| `AUTH_SECRET` | `npx auth secret` or `openssl rand -base64 32` | required |
-| `NEXTAUTH_URL` | your production URL | e.g. `https://shoeexpress.vercel.app` |
-| `NEXT_PUBLIC_SITE_URL` | your production URL | used in sitemap/OG/canonical |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL | image upload |
+| `DIRECT_URL` | Session/direct connection (port 5432) | `db push` / migrations only |
+| `AUTH_SECRET` | `npx auth secret` or `openssl rand -base64 32` | required, keep secret |
+| `NEXTAUTH_URL` | your production URL, e.g. `https://alqaim.store` | must match the served origin |
+| `NEXT_PUBLIC_SITE_URL` | same production URL, no trailing slash | canonical URLs, sitemap, social previews |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL | image uploads |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` | **server-only secret** |
-| `SUPABASE_STORAGE_BUCKET` | `product-images` | must exist & be public |
+| `SUPABASE_STORAGE_BUCKET` | `product-images` | must exist and be public |
+
+Never commit `.env`. It is git-ignored; put production values in Vercel's
+environment settings.
 
 ---
 
-## 3. Supabase Storage (for product/banner images)
+## 3. Supabase Storage (for your product photos, banners and logo)
 
 1. Supabase → **Storage** → **New bucket** → name `product-images` → **Public**.
-2. That's it — the app uploads via the service-role key server-side.
+2. That's all — uploads go through the server with the service-role key, and
+   the admin's upload buttons start working.
+
+Uploads accept JPEG, PNG, WebP and AVIF up to 5 MB. For product cut-outs in the
+hero, use a **PNG or WebP with a transparent background**.
 
 ---
 
 ## 4. Deploy to Vercel
 
-1. Vercel → **Add New → Project** → import your Git repo.
-2. Framework preset: **Next.js** (auto-detected).
-3. **Environment Variables**: paste every variable from §2.
-4. **Build command**: leave default (`next build`) — our `build` script runs
-   `prisma generate` first via `package.json`.
-5. Click **Deploy**.
+1. Vercel → **Add New → Project** → import the GitHub repository.
+2. Framework preset: **Next.js** (auto-detected). Leave the build command as is.
+3. **Environment Variables**: add every variable from §2.
+4. Click **Deploy**.
 
-### First-time production database
+`vercel.json` pins the server functions to **Mumbai (`bom1`)**, next to the
+Supabase database. Keep them in the same region: each page makes several
+database round trips, and across continents that adds seconds to every page.
+If you ever move the database, change the region to match.
 
-Run migrations against production once (locally, pointing at prod `DIRECT_URL`):
+### The production database
+
+The database you have been developing against *is* a Supabase project; you can
+launch on it directly or create a fresh project for production. For a fresh one:
 
 ```bash
-# with production DATABASE_URL/DIRECT_URL in your shell or a temporary .env
-npx prisma migrate deploy      # if you use migrations
-# — or —
-npm run db:push                # if you use db push
-npm run db:seed                # seed the first admin + content
-
-# Images live in /public. Either commit them, or run the pipeline in CI:
-npm run assets:build
+# with the production DATABASE_URL / DIRECT_URL in .env
+npm run db:push             # creates every table (including RateLimit)
+SEED_ADMIN_EMAIL=you@yourdomain.com SEED_ADMIN_PASSWORD='a-long-unique-password' npm run db:seed
 ```
-
-> Prefer `prisma migrate deploy` for production (tracked, reversible). Use
-> `db:push` only for the very first bootstrap if you haven't created migrations.
 
 ---
 
-## 5. Create the first admin
+## 5. Launch checklist
 
-The seed creates `admin@shoeexpress.test` / `changeme123` (or your
-`SEED_ADMIN_*`). **Log in and change the password immediately** at
-`/account/profile`, or create a fresh admin and delete the seeded one.
+Work through this once, in order, on the live site.
 
-To promote an existing user to admin without the seed, use Prisma Studio:
-
-```bash
-npm run db:studio    # open the User table, set role = SUPER_ADMIN
-```
+1. **Sign in to `/admin`** with the seeded admin, then go to `/account/profile`
+   and **change the password**. (Or create your own account, promote it to
+   `SUPER_ADMIN` in Admin → Users, and demote the seeded one.)
+2. **Remove the demo data** (demo customers, their orders and their reviews):
+   ```bash
+   npm run launch:prepare                      # dry run — shows what it will remove
+   npm run launch:prepare -- --apply           # do it
+   npm run launch:prepare -- --apply --catalog # …and also unpublish the demo products
+   ```
+   Your admin accounts, settings, homepage copy and categories are untouched.
+3. **Admin → Settings**: store name, **logo** (upload your original artwork —
+   it replaces the built-in mark in the header, footer and admin), contact
+   email, phone, address, **currency** (e.g. `PKR`), shipping, tax and your real
+   social profile URLs (leave blank to hide an icon).
+4. **Admin → Categories**: rename/add categories and give each a **photo** and
+   description — they appear in the header's Collections menu and on the
+   homepage.
+5. **Admin → Products → New**: add your products — images, colours, sizes,
+   prices, stock per variant, flags (*New arrival*, *Featured*, *Weekly pick*,
+   *On sale*) and SEO. Tick **Published** when ready.
+6. **Admin → Homepage**: hero heading and copy, and the **hero slides** — one
+   transparent product cut-out per slide, the product it links to (for the
+   name/price caption) and how long it holds. Also the weekly pick and the
+   membership block.
+7. **Admin → Banners**: replace the demo campaign ("Black Friday — up to 40%
+   off") with a real one, or switch it off.
+8. **Admin → Coupons**: `WELCOME20` and `FREESHIP` are samples — keep, edit or
+   delete them.
+9. **Legal pages** (`app/(store)/legal/[slug]/page.tsx`): replace the passages
+   marked `[REVIEW]` — company details in the imprint especially.
+10. Place a test **cash-on-delivery** order, move it through statuses in
+   Admin → Orders, and check stock drops and (on cancel) comes back.
 
 ---
 
 ## 6. Post-deploy smoke test
 
-Hit these on the live URL:
-
-- `/` — homepage renders, hero animates
+- `/` — hero renders and rotates; header menu opens
 - `/shop` — products load, filters work (`?category=sneakers`)
-- `/products/aero-runner-teal` — detail + variant selection
-- add to cart → `/cart` → `/checkout` → place COD order → `/checkout/success`
+- a product page — colour/size selection, add to cart
+- `/cart` → `/checkout` → place a COD order → `/checkout/success`
 - `/account/orders` — the order appears
-- `/admin` — dashboard metrics load (log in as admin)
-- `/api/health` — returns `{ "status": "ok", "db": "up" }`
-- `/sitemap.xml` and `/robots.txt` — resolve
+- `/admin` — dashboard loads; Admin → Messages shows contact-form mail
+- `/api/health` — `{ "status": "ok", "db": "up" }`
+- `/sitemap.xml` and `/robots.txt` — resolve with your domain
 
 ---
 
 ## 7. Custom domain
 
-Vercel → Project → **Domains** → add your domain → follow DNS instructions.
-Then update `NEXTAUTH_URL` and `NEXT_PUBLIC_SITE_URL` to the custom domain and
+Vercel → Project → **Domains** → add your domain → follow the DNS instructions.
+Then set `NEXTAUTH_URL` and `NEXT_PUBLIC_SITE_URL` to the custom domain and
 redeploy.
 
 ---
 
 ## 8. Ongoing
 
-- **Payments:** COD works today. To add cards, implement a provider in
-  `lib/payments/provider.ts` (the interface is already there) and add its keys.
-- **Email:** wire a provider (e.g. Resend) behind an email service; until then the
-  app never claims an email was sent.
-- **Backups:** Supabase provides automated backups on paid tiers.
+- **Payments:** cash on delivery works today. To take cards, implement a
+  provider in `lib/payments/provider.ts` (the interface is ready) and add it to
+  the checkout's `paymentMethod` enum.
+- **Email** (order confirmations, password reset): wire a provider such as
+  Resend behind a small service; the app never claims to have sent an email.
+- **Backups:** Supabase takes automated backups on paid plans.
 - **Monitoring:** point an uptime monitor at `/api/health`.
+- **Schema changes:** `npm run db:push` against the production `DIRECT_URL`,
+  or adopt `prisma migrate` once the schema settles.

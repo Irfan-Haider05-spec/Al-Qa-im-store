@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "assets:build": "node scripts/prepare-images.mjs"
+    "assets:build": "node scripts/prepare-images.mjs",
+    "launch:prepare": "tsx scripts/prepare-launch.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -29,6 +30,7 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "tailwind-merge": "2.6.0",
+    "three": "^0.170.0",
     "zod": "3.24.1"
   },
   "devDependencies": {
@@ -36,6 +38,7 @@
     "@types/node": "22.10.7",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",
+    "@types/three": "^0.170.0",
     "autoprefixer": "10.4.20",
     "eslint": "9.18.0",
     "eslint-config-next": "15.5.25",

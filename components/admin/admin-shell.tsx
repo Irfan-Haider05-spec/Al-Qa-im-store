@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ExternalLink, Menu, X } from "lucide-react";
+import type { Role } from "@prisma/client";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 
 /**
@@ -21,7 +22,7 @@ export function AdminShell({
 }: {
   children: React.ReactNode;
   userLabel: string;
-  role: string;
+  role: Role;
   logoutForm: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -42,8 +43,8 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      <aside className="fixed inset-y-0 left-0 hidden w-60 overflow-y-auto bg-secondary lg:block">
-        <AdminSidebar />
+      <aside className="surface-dark fixed inset-y-0 left-0 hidden w-60 overflow-y-auto lg:block">
+        <AdminSidebar role={role} />
       </aside>
 
       {open && (
@@ -58,7 +59,7 @@ export function AdminShell({
             role="dialog"
             aria-modal="true"
             aria-label="Admin navigation"
-            className="absolute inset-y-0 left-0 w-64 overflow-y-auto bg-secondary"
+            className="surface-dark absolute inset-y-0 left-0 w-64 overflow-y-auto"
           >
             <div className="flex justify-end p-3">
               <button
@@ -70,7 +71,7 @@ export function AdminShell({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <AdminSidebar />
+            <AdminSidebar role={role} />
           </div>
         </div>
       )}
@@ -103,8 +104,8 @@ export function AdminShell({
 
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {userLabel}
-              <span className="ml-1.5 rounded-pill bg-primary/10 px-2 py-0.5 text-xs text-primary-deep">
-                {role}
+              <span className="ml-1.5 rounded-pill bg-gold/15 px-2 py-0.5 text-xs text-gold-ink">
+                {role.replace("_", " ").toLowerCase()}
               </span>
             </span>
 

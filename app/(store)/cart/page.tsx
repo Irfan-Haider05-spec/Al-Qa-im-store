@@ -22,7 +22,7 @@ export default async function CartPage() {
     return (
       <div className="mx-auto grid max-w-content place-items-center px-5 pb-20 pt-40 text-center sm:px-8">
         <ShoppingBag className="h-12 w-12 text-muted-foreground" />
-        <h1 className="mt-4 font-display text-3xl font-bold">
+        <h1 className="mt-4 font-display text-[2.1rem] font-medium leading-tight tracking-[-0.015em]">
           Your cart is empty
         </h1>
         <p className="mt-2 text-muted-foreground">
@@ -43,8 +43,8 @@ export default async function CartPage() {
   const { shipping, tax, total, freeShippingGap } = await calculateTotals(subtotal);
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8">
-      <h1 className="mb-8 font-display text-4xl font-bold">
+    <div className="mx-auto max-w-content px-5 pb-20 pt-36 sm:px-8 lg:px-12">
+      <h1 className="mb-8 font-display text-[clamp(2.4rem,5vw,3.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">
         Cart <span className="text-muted-foreground">({itemCount})</span>
       </h1>
 

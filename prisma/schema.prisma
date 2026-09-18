@@ -452,3 +452,15 @@ model AdminActivityLog {
 
   @@index([createdAt])
 }
+
+// Fixed-window request counters for abuse-prone endpoints (sign-in,
+// registration, contact, coupons, checkout). Kept in Postgres rather than in
+// memory because serverless instances do not share memory. Rows are tiny and
+// self-expire logically; lib/security/rate-limit.ts prunes stale ones.
+model RateLimit {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}

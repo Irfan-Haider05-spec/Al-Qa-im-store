@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/session";
 import { logActivity } from "@/lib/admin/activity";
@@ -24,6 +25,7 @@ export async function createCategory(input: CategoryFormInput): Promise<Result> 
       name: parsed.data.name,
       slug: parsed.data.slug,
       description: parsed.data.description || null,
+      imageUrl: parsed.data.imageUrl || null,
       isActive: parsed.data.isActive,
       seoTitle: parsed.data.seoTitle || null,
       seoDesc: parsed.data.seoDesc || null,
@@ -37,7 +39,8 @@ export async function createCategory(input: CategoryFormInput): Promise<Result> 
     meta: { name: cat.name },
   });
   revalidatePath("/admin/categories");
-  revalidatePath("/");
+  // The header menu and homepage grid show categories on every page.
+  revalidateStorefront();
   return { ok: true, id: cat.id };
 }
 
@@ -61,6 +64,7 @@ export async function updateCategory(
       name: parsed.data.name,
       slug: parsed.data.slug,
       description: parsed.data.description || null,
+      imageUrl: parsed.data.imageUrl || null,
       isActive: parsed.data.isActive,
       seoTitle: parsed.data.seoTitle || null,
       seoDesc: parsed.data.seoDesc || null,
@@ -73,7 +77,8 @@ export async function updateCategory(
     entityId: id,
   });
   revalidatePath("/admin/categories");
-  revalidatePath("/");
+  // The header menu and homepage grid show categories on every page.
+  revalidateStorefront();
   return { ok: true, id };
 }
 
@@ -94,6 +99,7 @@ export async function deleteCategory(id: string): Promise<Result> {
     entityId: id,
   });
   revalidatePath("/admin/categories");
-  revalidatePath("/");
+  // The header menu and homepage grid show categories on every page.
+  revalidateStorefront();
   return { ok: true };
 }

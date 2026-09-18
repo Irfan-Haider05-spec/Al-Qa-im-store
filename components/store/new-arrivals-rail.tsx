@@ -36,7 +36,7 @@ export function NewArrivalsRail({
         "flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4",
         // Bleed to the screen edge on mobile so tiles run off-canvas the way
         // the reference does, then settle into the content column.
-        "-mx-5 px-5 sm:-mx-8 sm:px-8 lg:mx-0 lg:px-0",
+        "-mx-5 px-5 sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12",
         "rail-scroll",
       ].join(" ")}
     >
@@ -68,16 +68,16 @@ export function NewArrivalsRail({
                   over the product itself. */}
               <span
                 aria-hidden
-                className="absolute inset-0 bg-gradient-to-t from-secondary/85 via-secondary/20 to-transparent"
+                className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/20 to-transparent"
               />
 
               <span className="absolute inset-x-0 bottom-0 p-6 text-white">
                 {product.category && (
-                  <span className="block text-xs uppercase tracking-[0.18em] text-white/75">
+                  <span className="eyebrow block text-[0.62rem] text-gold-light">
                     {product.category.name}
                   </span>
                 )}
-                <span className="mt-1.5 block font-display text-2xl font-bold leading-tight">
+                <span className="mt-2 block font-display text-[1.7rem] font-medium leading-tight">
                   {product.name}
                 </span>
                 <span className="mt-1 flex items-baseline gap-2 text-sm">

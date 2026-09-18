@@ -349,7 +349,7 @@ export function CheckoutForm({
                       onApplyCoupon();
                     }
                   }}
-                  placeholder="WELCOME20"
+                  placeholder="Enter code"
                   className="w-full rounded-control border border-border bg-background px-3 py-2 text-sm uppercase focus:border-primary focus:outline-none"
                 />
                 <button

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/session";
@@ -59,7 +60,7 @@ export async function createProduct(
   });
 
   revalidatePath("/admin/products");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true, id: product.id };
 }
 
@@ -89,7 +90,7 @@ export async function updateProduct(
 
   revalidatePath("/admin/products");
   revalidatePath(`/products/${parsed.data.slug}`);
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true, id };
 }
 
@@ -106,7 +107,7 @@ export async function togglePublish(id: string, publish: boolean) {
     entityId: id,
   });
   revalidatePath("/admin/products");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true };
 }
 
@@ -120,7 +121,7 @@ export async function deleteProduct(id: string) {
     entityId: id,
   });
   revalidatePath("/admin/products");
-  revalidatePath("/");
+  revalidateStorefront();
   return { ok: true };
 }
 

@@ -3,6 +3,7 @@
 import { getCart } from "@/lib/cart/get-cart";
 import { getCurrentUser } from "@/lib/auth/session";
 import { calculateTotals, validateCoupon } from "@/lib/orders/totals";
+import { RULES, clientIp, rateLimit, tooManyMessage } from "@/lib/security/rate-limit";
 
 export type ApplyCouponResult =
   | {
@@ -24,8 +25,12 @@ export type ApplyCouponResult =
  * nothing else.
  */
 export async function applyCoupon(code: string): Promise<ApplyCouponResult> {
-  const trimmed = code.trim();
+  const trimmed = String(code ?? "").trim().slice(0, 40);
   if (!trimmed) return { ok: false, error: "Enter a coupon code." };
+
+  // Without this, codes can be guessed one request at a time.
+  const limited = await rateLimit(`coupon:${await clientIp()}`, RULES.coupon);
+  if (!limited.ok) return { ok: false, error: tooManyMessage(limited.retryAfterSec) };
 
   const [{ subtotal, lines }, user] = await Promise.all([
     getCart(),

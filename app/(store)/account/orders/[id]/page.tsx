@@ -44,7 +44,7 @@ export default async function OrderDetailPage({
           ← Back to orders
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h2 className="font-display text-2xl font-bold">
+          <h2 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">
             {order.orderNumber}
           </h2>
           <Badge tone="primary">{order.status}</Badge>

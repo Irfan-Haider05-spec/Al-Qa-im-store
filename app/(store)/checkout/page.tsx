@@ -30,8 +30,8 @@ export default async function CheckoutPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
-      <h1 className="mb-8 font-display text-4xl font-bold uppercase">Checkout</h1>
+    <div className="mx-auto max-w-content px-5 pb-20 pt-36 sm:px-8 lg:px-12">
+      <h1 className="mb-10 font-display text-[clamp(2.4rem,5vw,3.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">Checkout</h1>
       <CheckoutForm
         lines={lines}
         totals={totals}

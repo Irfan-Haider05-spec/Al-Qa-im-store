@@ -1,12 +1,14 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { checkoutSchema, type CheckoutInput } from "@/lib/validations/checkout";
 import { getPaymentProvider } from "@/lib/payments/provider";
 import { calculateTotals, validateCoupon } from "@/lib/orders/totals";
+import { RULES, clientIp, rateLimit, tooManyMessage } from "@/lib/security/rate-limit";
 import type { Prisma } from "@prisma/client";
 
 const GUEST_COOKIE = "se_cart";
@@ -20,8 +22,10 @@ function genOrderNumber() {
     d.getFullYear().toString().slice(2) +
     String(d.getMonth() + 1).padStart(2, "0") +
     String(d.getDate()).padStart(2, "0");
-  const rand = Math.random().toString(36).slice(2, 7).toUpperCase();
-  return `SE-${stamp}-${rand}`;
+  // Crypto-random rather than Math.random: order numbers appear in emails and
+  // URLs, and a predictable sequence invites guessing other people's orders.
+  const rand = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
+  return `AQ-${stamp}-${rand}`;
 }
 
 type OrderResult =
@@ -34,6 +38,9 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const data = parsed.data;
+
+  const limited = await rateLimit(`checkout:${await clientIp()}`, RULES.checkout);
+  if (!limited.ok) return { ok: false, error: tooManyMessage(limited.retryAfterSec) };
 
   const user = await getCurrentUser();
   const jar = await cookies();
@@ -71,6 +78,7 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
     productName: string;
     variantLabel: string | null;
     available: number;
+    published: boolean;
   };
 
   const priced: Priced[] = items.map(
@@ -83,7 +91,12 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
         inventory: { available: number } | null;
         color: { name: string } | null;
         size: { label: string } | null;
-        product: { name: string; basePrice: unknown; salePrice: unknown };
+        product: {
+          name: string;
+          basePrice: unknown;
+          salePrice: unknown;
+          isPublished: boolean;
+        };
       };
     }) => {
     const v = it.variant;
@@ -103,8 +116,19 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
       productName: p.name,
       variantLabel: [v.color?.name, v.size?.label].filter(Boolean).join(" · ") || null,
       available: v.inventory?.available ?? 0,
+      published: p.isPublished,
     };
   });
+
+  // A product unpublished (or pulled) after it went into a basket must not be
+  // sellable through that basket.
+  const withdrawn = priced.find((l) => !l.published);
+  if (withdrawn) {
+    return {
+      ok: false,
+      error: `"${withdrawn.productName}" is no longer available. Remove it from your cart to continue.`,
+    };
+  }
 
   // stock check
   for (const line of priced) {

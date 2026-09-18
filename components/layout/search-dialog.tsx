@@ -107,7 +107,7 @@ export function SearchDialog({ currency = "USD" }: { currency?: string }) {
         onClick={() => setOpen(true)}
         aria-label="Search products"
         aria-haspopup="dialog"
-        className="grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-muted"
+        className="grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-white/10 hover:text-gold-light"
       >
         <Search className="h-5 w-5" aria-hidden />
       </button>

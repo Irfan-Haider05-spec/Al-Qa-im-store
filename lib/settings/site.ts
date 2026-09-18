@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
+import { cachedStorefront } from "@/lib/cache/storefront";
 
 export type SiteSettingsView = {
   storeName: string;
@@ -15,7 +16,7 @@ export type SiteSettingsView = {
 };
 
 const FALLBACK: SiteSettingsView = {
-  storeName: "Shoe Express",
+  storeName: "Al-Qa’im",
   currency: "USD",
   contactEmail: null,
   phone: null,
@@ -36,7 +37,7 @@ const FALLBACK: SiteSettingsView = {
  * database is unreachable) rather than crashing the whole storefront over a
  * missing settings row.
  */
-export const getSiteSettings = cache(async (): Promise<SiteSettingsView> => {
+const readSettings = cachedStorefront(async (): Promise<SiteSettingsView> => {
   try {
     const settings = await prisma.siteSettings.findFirst();
     if (!settings) return FALLBACK;
@@ -59,7 +60,10 @@ export const getSiteSettings = cache(async (): Promise<SiteSettingsView> => {
   } catch {
     return FALLBACK;
   }
-});
+}, "site-settings");
+
+/** Per-request dedupe on top of the shared cache. */
+export const getSiteSettings = cache(() => readSettings());
 
 /** Human-readable shipping promise, e.g. "Free over $100 · $9 flat otherwise". */
 export function describeShipping(settings: SiteSettingsView) {

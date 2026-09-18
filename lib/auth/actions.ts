@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { registerSchema } from "@/lib/validations/checkout";
 import { signIn, signOut } from "@/lib/auth/auth";
+import { RULES, clientIp, rateLimit, tooManyMessage } from "@/lib/security/rate-limit";
 
 type RegisterResult = { ok: true } | { ok: false; error: string };
 
@@ -17,6 +18,9 @@ export async function registerUser(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { name, email, password } = parsed.data;
+
+  const limited = await rateLimit(`register:${await clientIp()}`, RULES.register);
+  if (!limited.ok) return { ok: false, error: tooManyMessage(limited.retryAfterSec) };
 
   // Same case-insensitive rule the sign-in lookup uses, so a second
   // registration with different capitalisation is caught as a duplicate
@@ -32,7 +36,7 @@ export async function registerUser(input: {
     data: {
       name,
       email,
-      passwordHash: await bcrypt.hash(password, 10),
+      passwordHash: await bcrypt.hash(password, 12),
       role: "CUSTOMER",
     },
   });

@@ -26,7 +26,7 @@ export async function uploadImage(
   }
 
   const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const path = `${Date.now()}-${safe}`;
+  const path = `${new Date().toISOString().slice(0, 7)}/${safe}`;
   const endpoint = `${base}/storage/v1/object/${BUCKET}/${path}`;
 
   const res = await fetch(endpoint, {
@@ -34,7 +34,9 @@ export async function uploadImage(
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": file.type || "application/octet-stream",
-      "x-upsert": "true",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      // Names are unique per upload; never silently replace an existing file.
+      "x-upsert": "false",
     },
     body: file,
   });

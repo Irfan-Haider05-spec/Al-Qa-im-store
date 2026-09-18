@@ -282,7 +282,7 @@ export function ShopFilters({
       <aside aria-label="Product filters" className="hidden lg:block">
         <div className="sticky top-24">
           <div className="mb-6 flex items-center gap-2">
-            <h2 className="font-display text-lg font-bold uppercase">Filters</h2>
+            <h2 className="eyebrow text-foreground">Filters</h2>
             {pending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Updating results" />
             )}
@@ -307,7 +307,7 @@ export function ShopFilters({
             className="absolute inset-y-0 left-0 flex w-[22rem] max-w-[88%] flex-col bg-background shadow-hover"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="font-display text-lg font-bold uppercase">Filters</h2>
+              <h2 className="eyebrow text-foreground">Filters</h2>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
@@ -345,7 +345,7 @@ function FilterGroup({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 font-display text-base font-semibold uppercase tracking-wide">
+      <legend className="mb-3.5 font-display text-lg font-medium">
         {title}
       </legend>
       {children}

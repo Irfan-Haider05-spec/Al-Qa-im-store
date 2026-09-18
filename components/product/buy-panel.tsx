@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus, ShoppingBag } from "lucide-react";
+import { Minus, Plus, RotateCcw, ShieldCheck, ShoppingBag, Truck } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
 import { WishlistButton } from "@/components/product/wishlist-button";
 import { useToast } from "@/components/ui/toast";
@@ -129,15 +129,15 @@ export function BuyPanel({
     <div className={cn("space-y-6", compact && "space-y-5")}>
       <div>
         {compact ? (
-          <h3 className="font-display text-2xl font-bold">{productName}</h3>
+          <h3 className="font-display text-[1.7rem] font-medium tracking-[-0.01em]">{productName}</h3>
         ) : (
-          <h1 className="font-display text-4xl font-bold leading-tight">
+          <h1 className="font-display text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.08] tracking-[-0.015em]">
             {productName}
           </h1>
         )}
 
         <div className="mt-3 flex items-baseline gap-3">
-          <span className="text-2xl font-semibold text-primary">
+          <span className="text-2xl font-semibold text-foreground">
             {formatPrice(price, currency)}
           </span>
           {hasDiscount && (
@@ -270,7 +270,7 @@ export function BuyPanel({
           type="button"
           onClick={onBuyNow}
           disabled={pending || totalStock === 0}
-          className="inline-flex h-12 items-center justify-center rounded-pill bg-secondary px-8 text-sm font-medium text-secondary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="bg-gold-gradient inline-flex h-12 items-center justify-center rounded-pill px-8 text-sm font-semibold text-ink shadow-gold transition-[filter] hover:brightness-105 disabled:opacity-50"
         >
           Buy it now
         </button>
@@ -288,6 +288,21 @@ export function BuyPanel({
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
+      )}
+
+      {!compact && (
+        <ul className="grid gap-3 border-t border-border pt-6 text-sm text-muted-foreground sm:grid-cols-3">
+          {[
+            { icon: Truck, label: "Ships in 24 hours" },
+            { icon: RotateCcw, label: "30-day returns" },
+            { icon: ShieldCheck, label: "Secure checkout" },
+          ].map(({ icon: Icon, label }) => (
+            <li key={label} className="flex items-center gap-2.5">
+              <Icon className="h-4 w-4 shrink-0 text-gold-ink" aria-hidden />
+              {label}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

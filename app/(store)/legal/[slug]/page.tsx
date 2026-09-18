@@ -163,7 +163,7 @@ export default async function LegalPage({
   const settings = await getSiteSettings();
 
   return (
-    <div className="mx-auto max-w-3xl px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
+    <div className="mx-auto max-w-3xl px-5 pb-20 pt-36 sm:px-8">
       <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
         <Link href="/" className="transition-colors hover:text-foreground">
           Home
@@ -172,7 +172,7 @@ export default async function LegalPage({
         <span className="text-foreground">{doc.title}</span>
       </nav>
 
-      <h1 className="font-display text-4xl font-bold uppercase sm:text-5xl">
+      <h1 className="font-display text-[clamp(2.4rem,5vw,3.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">
         {doc.title}
       </h1>
       <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{doc.intro}</p>
@@ -180,7 +180,7 @@ export default async function LegalPage({
       <div className="mt-12 space-y-10">
         {doc.sections.map((section) => (
           <section key={section.heading}>
-            <h2 className="font-display text-xl font-bold">{section.heading}</h2>
+            <h2 className="font-display text-xl font-semibold">{section.heading}</h2>
             <div className="mt-3 space-y-3 leading-relaxed text-muted-foreground">
               {section.body.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
@@ -191,7 +191,7 @@ export default async function LegalPage({
       </div>
 
       <div className="mt-14 rounded-card border border-border bg-muted/50 p-6">
-        <h2 className="font-display text-lg font-bold">Questions about this page?</h2>
+        <h2 className="font-display text-lg font-semibold">Questions about this page?</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {settings.contactEmail ? (
             <>

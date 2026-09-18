@@ -17,7 +17,7 @@ export default async function CheckoutSuccessPage({
   return (
     <div className="mx-auto grid max-w-content place-items-center px-5 pb-20 pt-40 text-center sm:px-8">
       <CheckCircle2 className="h-14 w-14 text-success" />
-      <h1 className="mt-4 font-display text-3xl font-bold">Thank you!</h1>
+      <h1 className="mt-4 font-display text-[2.1rem] font-medium leading-tight tracking-[-0.015em]">Thank you!</h1>
       <p className="mt-2 text-muted-foreground">
         Your order has been placed and is pending confirmation.
       </p>

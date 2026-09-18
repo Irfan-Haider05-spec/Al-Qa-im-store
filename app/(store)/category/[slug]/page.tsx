@@ -119,7 +119,7 @@ export default async function CategoryPage({
       />
 
       {/* Category banner — the photograph set in Admin → Categories. */}
-      <header className="relative isolate overflow-hidden bg-secondary pt-28 text-white sm:pt-32">
+      <header className="surface-dark relative isolate overflow-hidden pt-36 sm:pt-40">
         {category.imageUrl && (
           <>
             <Image
@@ -134,8 +134,8 @@ export default async function CategoryPage({
           </>
         )}
 
-        <div className="mx-auto max-w-content px-5 pb-14 sm:px-8">
-          <nav aria-label="Breadcrumb" className="mb-4 text-sm text-white/75">
+        <div className="mx-auto max-w-content px-5 pb-16 sm:px-8 lg:px-12">
+          <nav aria-label="Breadcrumb" className="eyebrow mb-5 text-[0.66rem] text-ivory/60">
             <Link href="/" className="transition-colors hover:text-white">
               Home
             </Link>
@@ -147,16 +147,16 @@ export default async function CategoryPage({
             <span className="text-white">{category.name}</span>
           </nav>
 
-          <h1 className="font-display text-4xl font-bold uppercase sm:text-6xl">
+          <h1 className="font-display text-[clamp(2.6rem,6vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.02em] text-ivory">
             {category.name}
           </h1>
           {category.description && (
-            <p className="mt-4 max-w-2xl text-white/85">{category.description}</p>
+            <p className="mt-5 max-w-2xl leading-relaxed text-ivory/70">{category.description}</p>
           )}
         </div>
       </header>
 
-      <div className="mx-auto max-w-content px-5 pt-10 sm:px-8">
+      <div className="mx-auto max-w-content px-5 pt-12 sm:px-8 lg:px-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
             {total} {total === 1 ? "product" : "products"}

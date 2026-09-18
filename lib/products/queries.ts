@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { cachedStorefront } from "@/lib/cache/storefront";
 import type { Prisma, Gender } from "@prisma/client";
 
 export type SortKey =
@@ -354,3 +355,111 @@ export async function searchSuggestions(q: string, take = 6) {
     image: p.images[0]?.url ?? null,
   }));
 }
+
+/* ------------------------------------------------------------- hero slides -- */
+
+/**
+ * Active hero slides with the product each one links to, so the hero caption
+ * can show a real name and price. `HeroSlide.productId` is a plain column (the
+ * slide can outlive its product), hence the second lookup rather than an
+ * include — and why a slide whose product was unpublished or deleted simply
+ * shows no caption instead of a broken link.
+ */
+async function readHeroSlides() {
+  const slides = await prisma.heroSlide.findMany({
+    where: { isActive: true },
+    orderBy: { position: "asc" },
+  });
+
+  const ids = slides.map((s) => s.productId).filter((id): id is string => Boolean(id));
+  const products = ids.length
+    ? await prisma.product.findMany({
+        where: { id: { in: ids }, isPublished: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          basePrice: true,
+          salePrice: true,
+          category: { select: { name: true } },
+        },
+      })
+    : [];
+  const byId = new Map(products.map((p) => [p.id, p]));
+
+  return slides.map((slide) => {
+    const product = slide.productId ? byId.get(slide.productId) : undefined;
+    return {
+      imageUrl: slide.imageUrl,
+      durationMs: slide.durationMs,
+      product: product
+        ? {
+            name: product.name,
+            slug: product.slug,
+            price: Number(product.salePrice ?? product.basePrice),
+            compareAt: product.salePrice != null ? Number(product.basePrice) : null,
+            category: product.category?.name ?? null,
+          }
+        : null,
+    };
+  });
+}
+
+/* ------------------------------------------------------------ social proof -- */
+
+/**
+ * Real, approved, well-rated reviews with something to say — for the homepage
+ * testimonials. Nothing here is invented: an empty store shows no section.
+ */
+async function readFeaturedReviews(take = 6) {
+  const reviews = await prisma.review.findMany({
+    where: {
+      isApproved: true,
+      rating: { gte: 4 },
+      comment: { not: null },
+      product: { isPublished: true },
+    },
+    include: {
+      user: { select: { name: true } },
+      product: { select: { name: true, slug: true } },
+    },
+    orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+    take: take * 3,
+  });
+
+  // One review per product, so the wall isn't five takes on the same shoe.
+  const seen = new Set<string>();
+  const unique = reviews.filter((r) => {
+    if (seen.has(r.productId)) return false;
+    seen.add(r.productId);
+    return true;
+  });
+
+  return unique.slice(0, take).map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    title: r.title,
+    comment: r.comment ?? "",
+    // First name and initial only — enough to feel real, not enough to expose.
+    author: r.user?.name
+      ? r.user.name.split(" ").map((part, i) => (i === 0 ? part : `${part[0]}.`)).join(" ")
+      : "Verified buyer",
+    product: r.product,
+  }));
+}
+
+/* Cached: JSON-safe, identical for every visitor, invalidated from the admin. */
+export const getHeroSlides = cachedStorefront(readHeroSlides, "hero-slides");
+export const getFeaturedReviews = cachedStorefront(readFeaturedReviews, "featured-reviews");
+
+/** Active categories for the header menu and footer, on every page. */
+export const getNavCategories = cachedStorefront(
+  () =>
+    prisma.category.findMany({
+      where: { isActive: true },
+      select: { slug: true, name: true, imageUrl: true },
+      orderBy: { name: "asc" },
+      take: 9,
+    }),
+  "nav-categories"
+);

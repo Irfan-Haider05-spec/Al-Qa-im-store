@@ -12,39 +12,52 @@
      element falls back to an inherited colour — which is how sidebar labels
      ended up dark-on-dark. Raw CSS uses `rgb(var(--token))`.
   */
-  --background: 255 255 255;
-  --foreground: 18 35 42;
+  --background: 250 248 244;     /* ivory  #FAF8F4 */
+  --foreground: 17 17 17;        /* ink    #111111 */
 
-  --primary: 13 127 143;
-  --primary-foreground: 255 255 255;
-  --primary-deep: 10 106 120;
+  /* Primary actions are ink, not gold: a black button on ivory is the classic
+     luxury retail pattern, and gold stays special by being used sparingly. */
+  --primary: 17 17 17;
+  --primary-foreground: 250 248 244;
+  --primary-deep: 0 0 0;
 
-  --secondary: 18 35 42;
-  --secondary-foreground: 255 255 255;
+  /* Dark surfaces — header, hero, footer. */
+  --secondary: 11 11 12;         /* #0B0B0C */
+  --secondary-foreground: 245 241 232;
 
-  --accent: 232 130 95;
-  --accent-foreground: 255 255 255;
+  --accent: 201 161 74;          /* gold   #C9A14A */
+  --accent-foreground: 17 17 17;
 
-  --muted: 244 247 248;
-  --muted-foreground: 91 112 120;
+  --muted: 242 238 230;
+  --muted-foreground: 106 100 91; /* 5.6:1 on ivory */
 
-  --border: 220 229 231;
+  --border: 229 223 211;
 
-  --success: 47 158 111;
-  --warning: 180 115 26;
-  --danger: 192 70 63;
+  /* Gold family. `gold` is for fills and decoration only — on ivory it
+     measures 2.3:1 and fails as text. `gold-ink` (4.8:1) is the text colour
+     for gold on light surfaces; `gold-light` is gold text on dark ones. */
+  --gold: 201 161 74;
+  --gold-light: 236 204 128;
+  --gold-ink: 139 106 38;
+  --ivory: 245 241 232;
+
+  /* Focus ring: gold-ink reads on ivory; dark surfaces swap it (below). */
+  --ring: 139 106 38;
+
+  --success: 47 133 90;
+  --warning: 176 112 22;
+  --danger: 180 52 47;
 
   /* ---- radii (deliberately non-uniform) ---- */
   --r-pill: 999px;
-  --r-card: 14px;
-  --r-control: 10px;
-  --r-sm: 6px;
+  --r-card: 8px;
+  --r-control: 6px;
+  --r-sm: 4px;
 
-  /* ---- elevation ----
-     Tinted with the brand colour rather than a hardcoded copy of it, so
-     re-theming `--primary` carries through to the shadows too. */
-  --shadow-card: 0 10px 30px rgb(var(--primary) / 0.08);
-  --shadow-hover: 0 16px 40px rgb(var(--primary) / 0.14);
+  /* ---- elevation: soft, warm, never grey-blue ---- */
+  --shadow-card: 0 1px 2px rgb(17 17 17 / 0.04), 0 8px 24px rgb(17 17 17 / 0.06);
+  --shadow-hover: 0 2px 4px rgb(17 17 17 / 0.05), 0 18px 44px rgb(17 17 17 / 0.12);
+  --shadow-gold: 0 10px 40px rgb(201 161 74 / 0.28);
 
   /* ---- motion ---- */
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
@@ -68,16 +81,52 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Condensed editorial display treatment */
-.font-display {
-  font-family: var(--font-display), sans-serif;
-  letter-spacing: -0.01em;
-}
-
 /* Accessible focus — visible keyboard ring */
 :focus-visible {
-  outline: 2px solid rgb(var(--primary));
+  outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;
+}
+
+/* Brand building blocks. In the components layer so a utility on the same
+   element wins — `eyebrow text-[0.6rem]`, `surface-dark bg-transparent` —
+   instead of being silently overridden by rules declared after them. */
+@layer components {
+  /* Editorial serif for display type — matches the logo's wordmark. */
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+    letter-spacing: -0.015em;
+  }
+
+  /* Anything sitting on the dark brand surface: brighter focus ring and ivory
+     text by default, so nothing inherits ink-on-black. */
+  .surface-dark {
+    --ring: var(--gold-light);
+    background-color: rgb(var(--secondary));
+    color: rgb(var(--secondary-foreground));
+  }
+
+  /* Metallic gold for display type — the gradient from the logo. Falls back to
+     flat gold where background-clip:text isn't supported. */
+  .text-gold-gradient {
+    color: rgb(var(--gold-light));
+    background-image: linear-gradient(105deg, #fcebb0 0%, #edc76f 38%, #d8a245 70%, #b9832f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .bg-gold-gradient {
+    background-image: linear-gradient(105deg, #f7dc93 0%, #e2b85c 45%, #c9953a 100%);
+  }
+
+  /* Small editorial label above section headings. */
+  .eyebrow {
+    font-family: var(--font-body), system-ui, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+  }
 }
 
 /* ---------------------------------------------------------------- reveals --
@@ -154,6 +203,28 @@ body {
   }
 }
 
+/* ------------------------------------------------------------ hero bits -- */
+
+@keyframes hero-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@keyframes hero-caption {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes hero-scroll {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(220%); }
+}
+
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
 /* Hide the horizontal scrollbar on product rails without disabling scrolling. */
 .rail-scroll {
   scrollbar-width: none;
@@ -164,22 +235,20 @@ body {
 
 /* ------------------------------------------------------------ reduced motion --
 
-   Movement is removed; content still appears. Opacity is left alone because a
-   cross-fade is not the kind of motion that triggers vestibular symptoms, and
-   zeroing the transition entirely would make reveals snap.
+   Handled per component, deliberately not with a blanket rule.
+
+   The usual `* { transition-duration: 0.001ms !important }` looks tidy but
+   flattens everything: cross-fades, colour changes on hover, the hero's
+   gentle mode — and it outranks any component that tries to offer a calmer
+   alternative. Anyone with system animations turned off (a common Windows
+   setting, often switched off for speed rather than comfort) got a site that
+   felt broken. Large movement is removed where it happens instead: reveals
+   below, the hero's own gentle mode, and `motion-reduce:` variants.
 --------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
   }
 
   [data-js="on"] .reveal,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { requirePermission } from "@/lib/auth/session";
+import { imageUrlSchema } from "@/lib/validations/urls";
 
 export async function addProductImage(input: {
   productId: string;
@@ -10,7 +11,10 @@ export async function addProductImage(input: {
   alt?: string;
 }) {
   await requirePermission("products.write");
-  if (!input.url) return { ok: false, error: "No image URL" };
+  const url = imageUrlSchema.safeParse(input.url ?? "");
+  if (!url.success) {
+    return { ok: false, error: url.error.issues[0]?.message ?? "Invalid image URL" };
+  }
 
   const count = await prisma.productImage.count({
     where: { productId: input.productId },
@@ -19,8 +23,8 @@ export async function addProductImage(input: {
   await prisma.productImage.create({
     data: {
       productId: input.productId,
-      url: input.url,
-      alt: input.alt || null,
+      url: url.data,
+      alt: input.alt?.trim().slice(0, 160) || null,
       position: count,
       isPrimary: count === 0, // first image is primary
     },

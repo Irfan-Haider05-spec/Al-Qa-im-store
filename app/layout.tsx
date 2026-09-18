@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Roboto_Slab, Inter } from "next/font/google";
+import { Playfair_Display, Inter } from "next/font/google";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
-// The reference sets its headings — and the wordmark — in a heavy slab serif,
-// not a condensed sans. Roboto Slab carries the same weight range the rest of
-// the UI already asks for (`font-medium` through `font-bold`), so nothing has
-// to fake a bold.
-const display = Roboto_Slab({
+// Playfair Display is the closest open face to the Al-Qa’im wordmark: a
+// high-contrast transitional serif. Italic is loaded for the gold accent line
+// in the hero; the weights cover `font-medium` through `font-black`.
+const display = Playfair_Display({
   subsets: ["latin"],
-  weight: ["500", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
   variable: "--font-display",
   display: "swap",
 });
@@ -21,24 +22,23 @@ const body = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Shoe Express — Premium footwear for every step",
-    template: "%s · Shoe Express",
+    default: `${BRAND.name} — ${BRAND.tagline}`,
+    template: `%s · ${BRAND.name}`,
   },
-  description:
-    "Sneakers, performance runners, leather Oxfords and waterproof boots, chosen for how they wear. Free delivery over $100.",
+  description: BRAND.description,
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
   ),
-  applicationName: "Shoe Express",
+  applicationName: BRAND.name,
   openGraph: {
     type: "website",
-    siteName: "Shoe Express",
+    siteName: BRAND.name,
   },
   twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0d7f8f",
+  themeColor: BRAND.themeColor,
   width: "device-width",
   initialScale: 1,
 };

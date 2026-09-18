@@ -27,7 +27,7 @@ export async function generateMetadata({
   return {
     title: q ? `Search: ${q}` : (seo?.title ?? "Shop"),
     description:
-      seo?.description ?? "Browse the full Shoe Express collection.",
+      seo?.description ?? "Browse the full Al-Qa’im collection.",
     // A filtered or searched listing is the same catalogue sliced differently,
     // so it points back at the clean /shop URL instead of competing with it.
     alternates: { canonical: "/shop" },
@@ -105,9 +105,9 @@ export default async function ShopPage({
   const to = Math.min(page * filters.perPage, total);
 
   return (
-    <div className="mx-auto max-w-content px-5 pb-20 pt-28 sm:px-8 sm:pt-32">
+    <div className="mx-auto max-w-content px-5 pb-20 pt-36 sm:px-8 lg:px-12">
       <header className="mb-8">
-        <h1 className="font-display text-4xl font-bold uppercase sm:text-5xl">
+        <h1 className="font-display text-[clamp(2.4rem,5vw,3.75rem)] font-medium leading-[1.05] tracking-[-0.02em]">
           {filters.q ? `Results for “${filters.q}”` : "Shop"}
         </h1>
         <p className="mt-2 text-muted-foreground">

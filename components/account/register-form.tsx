@@ -1,19 +1,25 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { registerUser, loginWithCredentials } from "@/lib/auth/actions";
+import { authField, safeNext } from "@/components/account/login-form";
+import { BRAND } from "@/lib/brand";
 
 export function RegisterForm() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function submit() {
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const name = String(data.get("name") ?? "");
+    const email = String(data.get("email") ?? "");
+    const password = String(data.get("password") ?? "");
+
     setError(null);
     startTransition(async () => {
       const res = await registerUser({ name, email, password });
@@ -21,66 +27,103 @@ export function RegisterForm() {
         setError(res.error);
         return;
       }
-      // auto-login after successful registration
-      await loginWithCredentials(email, password);
-      router.push("/account");
+      // Sign straight in; if that fails for any reason, the login page works.
+      const signedIn = await loginWithCredentials(email, password);
+      router.push(signedIn.ok ? safeNext(params.get("next")) ?? "/account" : "/login");
       router.refresh();
     });
   }
 
   return (
     <div className="mx-auto w-full max-w-sm">
-      <h1 className="font-display text-3xl font-bold">Create account</h1>
+      <p className="eyebrow text-gold-ink">Join {BRAND.name}</p>
+      <h1 className="mt-3 font-display text-[2.1rem] font-medium leading-tight tracking-[-0.015em]">
+        Create account
+      </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Join Shoe Express — members get 20% off.
+        Track orders, save addresses and keep a wishlist across devices.
       </p>
 
-      <div className="mt-6 space-y-4">
+      <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
         <div>
-          <label className="mb-1 block text-sm font-medium">Name</label>
+          <label htmlFor="reg-name" className="mb-1.5 block text-sm font-medium">
+            Name
+          </label>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+            id="reg-name"
+            name="name"
+            autoComplete="name"
+            required
+            maxLength={80}
+            className={authField}
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Email</label>
+          <label htmlFor="reg-email" className="mb-1.5 block text-sm font-medium">
+            Email
+          </label>
           <input
+            id="reg-email"
+            name="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+            autoComplete="email"
+            required
+            className={authField}
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Password</label>
+          <label htmlFor="reg-password" className="mb-1.5 block text-sm font-medium">
+            Password
+          </label>
           <input
+            id="reg-password"
+            name="password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
-            className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            maxLength={128}
+            aria-describedby="reg-password-hint"
+            className={authField}
           />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p id="reg-password-hint" className="mt-1.5 text-xs text-muted-foreground">
             At least 8 characters.
           </p>
         </div>
 
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
 
         <button
-          onClick={submit}
+          type="submit"
           disabled={pending}
-          className="flex h-11 w-full items-center justify-center rounded-pill bg-primary font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center rounded-pill bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-deep disabled:opacity-50"
         >
           {pending ? "Creating…" : "Create account"}
         </button>
-      </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <p className="text-center text-xs text-muted-foreground">
+          By creating an account you agree to our{" "}
+          <Link href="/legal/terms" className="underline underline-offset-4 hover:text-foreground">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/legal/privacy" className="underline underline-offset-4 hover:text-foreground">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      </form>
+
+      <p className="mt-6 border-t border-border pt-6 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="text-primary hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-foreground underline underline-offset-4 hover:text-gold-ink"
+        >
           Log in
         </Link>
       </p>
