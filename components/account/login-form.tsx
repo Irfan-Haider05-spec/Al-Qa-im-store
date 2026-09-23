@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginWithCredentials } from "@/lib/auth/actions";
+import { GoogleButton } from "@/components/account/google-button";
 import { BRAND } from "@/lib/brand";
 
 /**
@@ -20,7 +21,7 @@ function safeNext(value: string | null): string | null {
 export const authField =
   "w-full rounded-control border border-border bg-background px-3.5 py-2.5 text-sm transition-colors focus:border-foreground focus:outline-none";
 
-export function LoginForm() {
+export function LoginForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,18 @@ export function LoginForm() {
         Sign in to your {BRAND.name} account.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+      {googleEnabled && (
+        <div className="mt-7">
+          <GoogleButton next={params.get("from") === "admin" ? "/admin" : (safeNext(params.get("next")) ?? "/account")} />
+          <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className={googleEnabled ? "space-y-4" : "mt-7 space-y-4"} noValidate>
         <div>
           <label htmlFor="login-email" className="mb-1.5 block text-sm font-medium">
             Email

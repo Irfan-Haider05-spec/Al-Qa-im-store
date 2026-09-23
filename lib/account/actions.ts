@@ -63,12 +63,17 @@ export async function updateProfile(input: { name: string }) {
 }
 
 const passwordSchema = z.object({
-  current: z.string().min(1, "Current password required"),
-  next: z.string().min(8, "New password must be at least 8 characters"),
+  // Optional only for accounts that have no password yet (Google sign-in):
+  // there is nothing to confirm, and the session already proves who they are.
+  current: z.string().max(128).optional().or(z.literal("")),
+  next: z
+    .string()
+    .min(8, "New password must be at least 8 characters")
+    .max(128, "New password must be at most 128 characters"),
 });
 
 export async function changePassword(input: {
-  current: string;
+  current?: string;
   next: string;
 }) {
   const sessionUser = await requireUser();
@@ -82,12 +87,18 @@ export async function changePassword(input: {
   });
   if (!dbUser) return { ok: false, error: "User not found" };
 
-  const ok = await bcrypt.compare(parsed.data.current, dbUser.passwordHash);
-  if (!ok) return { ok: false, error: "Current password is incorrect." };
+  if (dbUser.passwordHash) {
+    if (!parsed.data.current) {
+      return { ok: false, error: "Enter your current password." };
+    }
+    const ok = await bcrypt.compare(parsed.data.current, dbUser.passwordHash);
+    if (!ok) return { ok: false, error: "Current password is incorrect." };
+  }
 
   await prisma.user.update({
     where: { id: dbUser.id },
-    data: { passwordHash: await bcrypt.hash(parsed.data.next, 10) },
+    data: { passwordHash: await bcrypt.hash(parsed.data.next, 12) },
   });
+  revalidatePath("/account/profile");
   return { ok: true };
 }

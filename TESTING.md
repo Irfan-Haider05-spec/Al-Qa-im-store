@@ -24,6 +24,11 @@ Run through this before considering a release done. Check each box.
 ## Customer — auth & checkout
 
 - [ ] Register creates an account and auto-logs in
+- [ ] Checkout as a guest redirects to login, and returns to checkout after signing in
+- [ ] The guest basket is still there after signing in
+- [ ] An order placed as a guest appears under My orders after signing in with the same email (any capitalisation)
+- [ ] "Continue with Google" signs in, creates the customer, and lands on the right page (only when configured)
+- [ ] A Google account can set a password in Account → Profile, then sign in with email too
 - [ ] Login / logout work
 - [ ] Checkout requires a size-selected variant in cart
 - [ ] Place COD order → success page shows order number

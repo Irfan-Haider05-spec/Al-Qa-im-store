@@ -58,6 +58,11 @@ PostgreSQL via Prisma, Auth.js v5, Tailwind, three.js and Framer Motion.
   (moderated), and related products
 - Cart (database-backed for customers, cookie-token for guests), coupons,
   checkout, order history, wishlist, addresses and account management
+- **Checkout needs an account**, so every order belongs to a customer and can
+  be tracked from "My orders". Signing in carries the guest basket over, and
+  any order placed earlier as a guest with that email is attached to the
+  account automatically
+- Sign in with email and password, or with Google when it is configured
 
 **Admin** (`/admin`)
 
@@ -102,6 +107,8 @@ Open <http://localhost:3000>. The seed prints the admin credentials it created.
 | `AUTH_SECRET` | yes | Signs session JWTs. Generate with `npx auth secret` or `openssl rand -base64 32`. |
 | `NEXTAUTH_URL` | yes | The site's own origin, e.g. `https://alqaim.store`. Auth.js builds its redirects from it, so it must match the URL you serve from. |
 | `NEXT_PUBLIC_SITE_URL` | yes | Public origin, used for canonical URLs, Open Graph, sitemap and JSON-LD. **Set this in production** or those URLs point at localhost. |
+| `AUTH_GOOGLE_ID` | no | Google OAuth client ID. Set both Google values to offer "Continue with Google"; leave them empty and the button is hidden. |
+| `AUTH_GOOGLE_SECRET` | no | Google OAuth client secret. **Server-only secret.** |
 | `SEED_ADMIN_EMAIL` | no | Email for the admin the seed creates. Default `admin@alqaim.test`. |
 | `SEED_ADMIN_PASSWORD` | no | Its password. Default `changeme123` locally; the seed **refuses** to run with `NODE_ENV=production` unless you set a 12+ character one. |
 | `NEXT_PUBLIC_SUPABASE_URL` | for uploads | Supabase project URL, for admin image uploads. |
@@ -262,6 +269,13 @@ Enforcement is in two layers, and the second is the one that matters:
 Hiding a button is presentation, not security — the server never trusts the UI.
 (The admin sidebar does hide sections a role can't open, purely so nobody is
 shown a link that leads to a "forbidden" page.)
+
+Sign-in methods: email/password (bcrypt) and, when `AUTH_GOOGLE_ID` /
+`AUTH_GOOGLE_SECRET` are set, Google. There is no database adapter — sessions
+are JWTs — so a Google sign-in creates the customer row itself and the token
+carries this store's user id and role. Google accounts have no password until
+they choose one in Account → Profile; password sign-in is refused for them
+until they do.
 
 Roles are read **from the database on every request**, not from the session
 token, so demoting or deleting an admin takes effect immediately rather than
@@ -464,6 +478,9 @@ Honest list of what is *not* done:
 - **Product images are stock photography**, and the seeded reviews, customers
   and orders are demo data. `npm run launch:prepare` removes the demo people,
   orders and reviews; replace or unpublish the demo products before selling.
+- **Local development on Node 24** can hang when submitting the sign-in form
+  (a Node/undici stream bug outside this project). Node 20 or 22 LTS is what
+  Vercel runs and what this app is tested on.
 - **No self-service password reset.** It needs an email provider; until one
   is configured, the login page points customers to the contact form.
 - **The logo is a vector recreation** of the Al-Qa’im mark. Upload the original

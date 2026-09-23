@@ -13,10 +13,13 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
+  // Checkout needs an account: it is what ties the order to a customer, so
+  // they can track it afterwards from "My orders".
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent("/checkout")}`);
+
   const { lines, subtotal } = await getCart();
   if (lines.length === 0) redirect("/cart");
-
-  const user = await getCurrentUser();
 
   const [totals, settings, savedAddresses] = await Promise.all([
     calculateTotals(subtotal),

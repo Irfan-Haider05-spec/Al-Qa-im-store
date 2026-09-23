@@ -26,6 +26,10 @@ export default async function CheckoutSuccessPage({
           Order number: <span className="font-semibold">{order}</span>
         </p>
       )}
+      <p className="mt-3 max-w-md text-sm text-muted-foreground">
+        It&apos;s saved to your account — track its progress any time under
+        My orders.
+      </p>
       <div className="mt-8 flex gap-3">
         <Link
           href="/account/orders"
