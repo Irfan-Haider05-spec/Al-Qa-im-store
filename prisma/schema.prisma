@@ -61,7 +61,9 @@ enum Gender {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  passwordHash  String
+  // Null for accounts created through Google sign-in: they have no password
+  // here, and password sign-in is refused for them.
+  passwordHash  String?
   name          String?
   role          Role      @default(CUSTOMER)
   emailVerified DateTime?

@@ -6,9 +6,12 @@ import { updateProfile, changePassword } from "@/lib/account/actions";
 export function ProfileForm({
   initialName,
   email,
+  hasPassword = true,
 }: {
   initialName: string;
   email: string;
+  /** False for accounts created through Google, which have no password yet. */
+  hasPassword?: boolean;
 }) {
   const [name, setName] = useState(initialName);
   const [nameMsg, setNameMsg] = useState<string | null>(null);
@@ -74,25 +77,37 @@ export function ProfileForm({
       </section>
 
       <section>
-        <h2 className="font-display text-xl font-semibold">Password</h2>
+        <h2 className="font-display text-xl font-semibold">
+          {hasPassword ? "Password" : "Set a password"}
+        </h2>
+        {!hasPassword && (
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            You signed in with Google. Setting a password here lets you sign in with
+            your email as well — Google keeps working either way.
+          </p>
+        )}
         <div className="mt-4 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium">
-              Current password
-            </label>
-            <input
-              type="password"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
-            />
-          </div>
+          {hasPassword && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Current password
+              </label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium">
               New password
             </label>
             <input
               type="password"
+              autoComplete="new-password"
               value={next}
               onChange={(e) => setNext(e.target.value)}
               className="w-full rounded-control border border-border px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
@@ -108,7 +123,7 @@ export function ProfileForm({
             disabled={pending}
             className="inline-flex h-10 items-center rounded-pill bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary-deep disabled:opacity-50"
           >
-            Update password
+            {hasPassword ? "Update password" : "Set password"}
           </button>
         </div>
       </section>

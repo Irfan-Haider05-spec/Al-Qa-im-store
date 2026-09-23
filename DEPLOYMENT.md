@@ -47,7 +47,8 @@ From **Supabase → Connect → ORMs → Prisma**, copy both URLs.
 | `DATABASE_URL` | Transaction pooler (port 6543, `?pgbouncer=true`) | runtime |
 | `DIRECT_URL` | Session/direct connection (port 5432) | `db push` / migrations only |
 | `AUTH_SECRET` | `npx auth secret` or `openssl rand -base64 32` | required, keep secret |
-| `NEXTAUTH_URL` | your production URL, e.g. `https://alqaim.store` | must match the served origin |
+| `NEXTAUTH_URL` | your production URL, e.g. `https://alqaim.store` | must match the served origin — a value like `http://localhost:3000` here sends customers to a dead address |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | from the Google console (§3b) | optional; enables "Continue with Google" |
 | `NEXT_PUBLIC_SITE_URL` | same production URL, no trailing slash | canonical URLs, sitemap, social previews |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL | image uploads |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` | **server-only secret** |
@@ -66,6 +67,29 @@ environment settings.
 
 Uploads accept JPEG, PNG, WebP and AVIF up to 5 MB. For product cut-outs in the
 hero, use a **PNG or WebP with a transparent background**.
+
+---
+
+## 3b. Google sign-in (optional)
+
+1. [Google Cloud console](https://console.cloud.google.com/) → create or pick a
+   project → **APIs & Services → OAuth consent screen**: External, add your app
+   name, support email and logo, then publish it (while it is in "Testing" only
+   the test users you list can sign in).
+2. **APIs & Services → Credentials → Create credentials → OAuth client ID →
+   Web application**:
+   - Authorised JavaScript origins: `https://your-domain.com` (and
+     `http://localhost:3000` for local work)
+   - Authorised redirect URIs:
+     `https://your-domain.com/api/auth/callback/google`
+     (and `http://localhost:3000/api/auth/callback/google`)
+3. Copy the client ID and secret into Vercel → Settings → Environment
+   Variables as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`, then **redeploy**.
+4. "Continue with Google" now appears on the login and register pages. Without
+   these two variables the button is hidden and nothing else changes.
+
+> The redirect URI must match exactly, including `https` and no trailing
+> slash. A mismatch shows Google's "redirect_uri_mismatch" error.
 
 ---
 

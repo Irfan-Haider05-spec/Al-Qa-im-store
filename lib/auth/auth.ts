@@ -1,10 +1,14 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { authConfig } from "@/lib/auth/auth.config";
 import { RULES, clientIpFrom, rateLimit } from "@/lib/security/rate-limit";
+import { attachGuestActivity } from "@/lib/auth/on-sign-in";
+import { googleClientId, googleClientSecret, isGoogleEnabled } from "@/lib/auth/providers";
 
 const credentialsSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -61,7 +65,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // measurably different times, which is enough to enumerate accounts.
         const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
 
-        if (!user || !ok) return null;
+        // A Google-created account has no password here; it can only sign in
+        // through Google.
+        if (!user || !user.passwordHash || !ok) return null;
 
         return {
           id: user.id,
@@ -71,5 +77,77 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    // Offered only when the credentials are configured, so a store without
+    // them shows no dead button.
+    ...(isGoogleEnabled()
+      ? [
+          Google({
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+            // Always let people choose the account, rather than silently
+            // reusing whichever one the browser is already signed into.
+            authorization: { params: { prompt: "select_account" } },
+          }),
+        ]
+      : []),
   ],
+  callbacks: {
+    ...authConfig.callbacks,
+
+    /**
+     * There is no database adapter (sessions are JWTs), so a Google sign-in
+     * has to create the customer row itself — otherwise there would be
+     * nothing to hang orders, addresses or a wishlist on.
+     */
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "google") return true;
+
+      const email = user.email?.toLowerCase();
+      // An unverified Google address could belong to someone else.
+      if (!email || profile?.email_verified === false) return false;
+
+      const existing = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { id: true, name: true },
+      });
+
+      if (!existing) {
+        await prisma.user.create({
+          data: { email, name: user.name ?? null, role: "CUSTOMER" },
+        });
+      } else if (!existing.name && user.name) {
+        await prisma.user.update({ where: { id: existing.id }, data: { name: user.name } });
+      }
+      return true;
+    },
+
+    /**
+     * The token must carry *our* user id and role. For Google that means
+     * looking the row up by email, because the provider's id is its own.
+     * Only runs at sign-in (`user` is set), never on the Edge.
+     */
+    async jwt({ token, user, account }) {
+      if (user && account?.provider === "google") {
+        const row = await prisma.user.findFirst({
+          where: { email: { equals: user.email ?? "", mode: "insensitive" } },
+          select: { id: true, role: true },
+        });
+        if (row) {
+          token.id = row.id;
+          token.role = row.role as Role;
+        }
+        return token;
+      }
+      return authConfig.callbacks.jwt({ token, user, account });
+    },
+  },
+  events: {
+    /**
+     * Pick up what the customer did before signing in: orders placed as a
+     * guest with this email, and anything left in the guest basket.
+     */
+    async signIn({ user }) {
+      await attachGuestActivity(user.email);
+    },
+  },
 });

@@ -56,6 +56,19 @@ export async function loginWithCredentials(
   }
 }
 
+/**
+ * Starts the Google sign-in flow. Auth.js redirects out of the server action,
+ * so this never returns normally.
+ */
+export async function signInWithGoogle(next?: string) {
+  // Same-site paths only — an open redirect through the login page would be a
+  // gift to a phisher.
+  const target = next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+    ? next
+    : "/account";
+  await signIn("google", { redirectTo: target });
+}
+
 export async function logout() {
   await signOut({ redirectTo: "/" });
 }

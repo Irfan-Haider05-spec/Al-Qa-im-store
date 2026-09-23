@@ -1,6 +1,5 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
@@ -9,9 +8,9 @@ import { checkoutSchema, type CheckoutInput } from "@/lib/validations/checkout";
 import { getPaymentProvider } from "@/lib/payments/provider";
 import { calculateTotals, validateCoupon } from "@/lib/orders/totals";
 import { RULES, clientIp, rateLimit, tooManyMessage } from "@/lib/security/rate-limit";
+import { mergeGuestCart } from "@/lib/auth/on-sign-in";
 import type { Prisma } from "@prisma/client";
 
-const GUEST_COOKIE = "se_cart";
 
 // The interactive-transaction client type, exported by the generated Prisma client.
 type TxClient = Prisma.TransactionClient;
@@ -42,16 +41,18 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
   const limited = await rateLimit(`checkout:${await clientIp()}`, RULES.checkout);
   if (!limited.ok) return { ok: false, error: tooManyMessage(limited.retryAfterSec) };
 
+  // Every order belongs to an account. Without one there is nothing for the
+  // customer to track afterwards, and no way to prove the order is theirs.
   const user = await getCurrentUser();
-  const jar = await cookies();
-  const guestToken = jar.get(GUEST_COOKIE)?.value;
+  if (!user) {
+    return { ok: false, error: "Please sign in to place your order." };
+  }
 
-  const cart = user
-    ? await prisma.cart.findUnique({ where: { userId: user.id } })
-    : guestToken
-      ? await prisma.cart.findUnique({ where: { guestToken } })
-      : null;
+  // Safety net: if a basket built while signed out never got merged (a failed
+  // sign-in hook, a second tab), fold it in now rather than losing it.
+  await mergeGuestCart(user.id);
 
+  const cart = await prisma.cart.findUnique({ where: { userId: user.id } });
   if (!cart) return { ok: false, error: "Your cart is empty." };
 
   const items = await prisma.cartItem.findMany({
@@ -146,7 +147,7 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
   let discount = 0;
   let couponId: string | null = null;
   if (data.couponCode) {
-    const check = await validateCoupon(data.couponCode, subtotal, user?.id ?? null);
+    const check = await validateCoupon(data.couponCode, subtotal, user.id);
     if (!check.ok) return { ok: false, error: check.error };
     discount = check.discount;
     couponId = check.couponId;
@@ -178,7 +179,7 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
       const order = await tx.order.create({
         data: {
           orderNumber,
-          userId: user?.id ?? null,
+          userId: user.id,
           status: "PENDING",
           subtotal,
           discount,
@@ -222,7 +223,7 @@ export async function placeOrder(input: CheckoutInput): Promise<OrderResult> {
       // only counts logged-in redemptions is not a cap.
       if (couponId) {
         await tx.couponUsage.create({
-          data: { couponId, userId: user?.id ?? null, orderId: order.id },
+          data: { couponId, userId: user.id, orderId: order.id },
         });
       }
 

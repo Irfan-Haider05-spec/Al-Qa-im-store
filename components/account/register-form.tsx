@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { registerUser, loginWithCredentials } from "@/lib/auth/actions";
 import { authField, safeNext } from "@/components/account/login-form";
+import { GoogleButton } from "@/components/account/google-button";
 import { BRAND } from "@/lib/brand";
 
-export function RegisterForm() {
+export function RegisterForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +42,21 @@ export function RegisterForm() {
         Create account
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Track orders, save addresses and keep a wishlist across devices.
+        Track every order, save your addresses and keep a wishlist across devices.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-7 space-y-4" noValidate>
+      {googleEnabled && (
+        <div className="mt-7">
+          <GoogleButton next={safeNext(params.get("next")) ?? "/account"} label="Sign up with Google" />
+          <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className={googleEnabled ? "space-y-4" : "mt-7 space-y-4"} noValidate>
         <div>
           <label htmlFor="reg-name" className="mb-1.5 block text-sm font-medium">
             Name

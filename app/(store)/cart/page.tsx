@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
 import { getCart } from "@/lib/cart/get-cart";
+import { getCurrentUser } from "@/lib/auth/session";
 import { calculateTotals } from "@/lib/orders/totals";
 import { getSiteSettings } from "@/lib/settings/site";
 import { CartLineItem } from "@/components/cart/cart-line-item";
@@ -13,9 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function CartPage() {
-  const [{ lines, subtotal, itemCount }, settings] = await Promise.all([
+  const [{ lines, subtotal, itemCount }, settings, user] = await Promise.all([
     getCart(),
     getSiteSettings(),
+    getCurrentUser(),
   ]);
 
   if (lines.length === 0) {
@@ -85,11 +87,17 @@ export default async function CartPage() {
           </dl>
 
           <Link
-            href="/checkout"
+            href={user ? "/checkout" : `/login?next=${encodeURIComponent("/checkout")}`}
             className="mt-6 flex h-12 items-center justify-center rounded-pill bg-primary font-medium text-primary-foreground hover:bg-primary-deep"
           >
-            Checkout
+            {user ? "Checkout" : "Sign in to check out"}
           </Link>
+          {!user && (
+            <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
+              Orders are saved to your account, so you can track them any time.
+              Your basket comes with you.
+            </p>
+          )}
           <Link
             href="/shop"
             className="mt-3 flex h-11 items-center justify-center rounded-pill border border-border text-sm hover:bg-background"

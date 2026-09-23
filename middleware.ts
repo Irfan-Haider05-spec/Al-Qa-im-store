@@ -26,7 +26,7 @@ export default auth((req) => {
     }
   }
 
-  if (pathname.startsWith("/account") && !user) {
+  if ((pathname.startsWith("/account") || pathname.startsWith("/checkout")) && !user) {
     // Send them back where they were once they've signed in.
     const next = encodeURIComponent(`${pathname}${search}`);
     return NextResponse.redirect(new URL(`/login?next=${next}`, req.url));
@@ -36,5 +36,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*"],
+  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*"],
 };
